@@ -1,7 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Suzume.Core/Suzume.Core.csproj" />
     <Project Path="src/Suzume/Suzume.csproj">
       <Platform Project="x64" />
     </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Suzume.Core.Tests/Suzume.Core.Tests.csproj" />
   </Folder>
 </Solution>
