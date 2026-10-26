@@ -57,6 +57,11 @@ public sealed unsafe class ProbeRunner
             case "anim":
                 ((Character*)minion)->Timeline.BaseOverride = TimelineId;
                 break;
+            case "play":
+                // スロット 1 用のアニメ (idle_sp など) はベース上書きで出ないため、直接再生する。1 回だけ呼ぶ
+                ((Character*)minion)->Timeline.TimelineSequencer.PlayTimeline(TimelineId, null);
+                Mode = "played";
+                break;
             case "freeze":
                 minion->MoveDestination = go->Position;
                 break;

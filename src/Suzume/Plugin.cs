@@ -46,7 +46,7 @@ public sealed class Plugin : IDalamudPlugin
         Framework.Update += probe.OnUpdate;
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
+            HelpMessage = "設定画面を開きます。/suzume probe <bounce|offsetx|spin|pitch|pitchdraw|anim <id>|play <id>|freeze|off> / /suzume info はデバッグ用です。",
         });
     }
 
