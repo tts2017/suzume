@@ -93,7 +93,7 @@ public sealed unsafe class ProbeRunner
             return $"タビスズメが見つかりません。{DescribeSearch(owner)}";
 
         var go = (GameObject*)minion;
-        return $"CompanionId={owner->CompanionData.CompanionId} BaseId={go->BaseId} "
+        return $"PlayerPos={((GameObject*)owner)->Position:F2} BaseId={go->BaseId} "
             + $"Pos={go->Position:F2} Rot={go->Rotation:F2} DrawOffset={go->DrawOffset:F2} "
             + $"BaseOverride={((Character*)minion)->Timeline.BaseOverride} Behavior={minion->Behavior} "
             + $"MoveDest={minion->MoveDestination:F2} DrawObject={(nint)go->DrawObject:X}";
