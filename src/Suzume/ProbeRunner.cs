@@ -90,13 +90,34 @@ public sealed unsafe class ProbeRunner
         if (owner == null)
             return "プレイヤーがいません";
         if (minion == null)
-            return $"タビスズメが出ていません (CompanionId={owner->CompanionData.CompanionId})";
+            return $"タビスズメが見つかりません。{DescribeSearch(owner)}";
 
         var go = (GameObject*)minion;
         return $"CompanionId={owner->CompanionData.CompanionId} BaseId={go->BaseId} "
             + $"Pos={go->Position:F2} Rot={go->Rotation:F2} DrawOffset={go->DrawOffset:F2} "
             + $"BaseOverride={((Character*)minion)->Timeline.BaseOverride} Behavior={minion->Behavior} "
             + $"MoveDest={minion->MoveDestination:F2} DrawObject={(nint)go->DrawObject:X}";
+    }
+
+    /// <summary>ミニオン検出の各経路の値(タビスズメが見つからないときの調査用)。</summary>
+    private static string DescribeSearch(Character* owner)
+    {
+        var own = MinionTracker.FindOwnMinion(out _);
+        var ownerId = ((GameObject*)owner)->EntityId;
+        var companions = new List<string>();
+        foreach (var obj in Plugin.ObjectTable)
+        {
+            var go = (GameObject*)obj.Address;
+            if (go != null && go->ObjectKind == ObjectKind.Companion)
+                companions.Add($"[{go->ObjectIndex}] BaseId={go->BaseId} OwnerId={go->OwnerId:X}");
+        }
+
+        return $"CompanionData.CompanionId={owner->CompanionData.CompanionId} "
+            + $"CompanionData.CompanionObject={(nint)owner->CompanionData.CompanionObject:X} "
+            + $"Character.ChildObject={(nint)owner->ChildObject:X} "
+            + $"自分のミニオン BaseId={(own != null ? ((GameObject*)own)->BaseId.ToString() : "なし")} "
+            + $"プレイヤー EntityId={ownerId:X} "
+            + $"ミニオン一覧: {(companions.Count == 0 ? "なし" : string.Join(", ", companions))}";
     }
 
     private static void WritePitch(GameObject* go, float pitch)
