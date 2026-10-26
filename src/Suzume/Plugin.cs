@@ -3,6 +3,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Suzume.Core;
 using Suzume.Windows;
 
 namespace Suzume;
@@ -15,6 +16,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+    [PluginService] internal static ICondition Condition { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
@@ -22,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem windowSystem = new("Suzume");
     private readonly ConfigWindow configWindow;
     private readonly ChirpPlayer? chirpPlayer;
+    private readonly SparrowController controller;
     private readonly ProbeRunner probe = new();
 
     public Plugin()
@@ -38,22 +42,55 @@ public sealed class Plugin : IDalamudPlugin
             Log.Error(ex, "鳴き声の初期化に失敗しました。音なしで動作します");
         }
 
-        configWindow = new ConfigWindow(config, probe.Describe, kind => chirpPlayer?.Play(kind, config.Volume));
+        controller = new SparrowController(config, chirpPlayer);
+        configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume));
         windowSystem.AddWindow(configWindow);
         PluginInterface.UiBuilder.Draw += OnDraw;
         PluginInterface.UiBuilder.OpenConfigUi += configWindow.Toggle;
         PluginInterface.UiBuilder.OpenMainUi += configWindow.Toggle;
-        Framework.Update += probe.OnUpdate;
+        Framework.Update += OnUpdate;
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume probe <bounce|offsetx|spin|pitch|pitchdraw|anim <id>|play <id>|freeze|off> / /suzume info はデバッグ用です。",
+            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
         });
+    }
+
+    private bool Probing => probe.Mode != ProbeRunner.Off;
+
+    private void OnUpdate(IFramework framework)
+    {
+        // 確認コマンドの実行中は、通常の制御を止める
+        if (Probing)
+        {
+            controller.Suspend();
+            probe.OnUpdate(framework);
+            return;
+        }
+
+        controller.Update(framework);
     }
 
     private void OnDraw()
     {
-        probe.OnDraw();
+        if (Probing)
+            probe.OnDraw();
+        else
+            controller.OnDraw();
+
         windowSystem.Draw();
+    }
+
+    private string DescribeState()
+    {
+        if (!controller.Active)
+            return $"停止中\n{probe.Describe()}";
+
+        var pose = controller.LastPose;
+        var gap = Angles.HorizontalDistance(pose.Position, controller.LastTarget);
+        return $"状態: {pose.State} / アニメ: {pose.Anim}\n"
+            + $"見た目の位置: {pose.Position:F2}\n"
+            + $"目標地点: {controller.LastTarget:F2}\n"
+            + $"差: {gap:F2} y";
     }
 
     private void HandleCommand(string args)
@@ -65,26 +102,35 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (parts.Length >= 2 && parts[0] == "probe")
+        switch (parts[0])
         {
-            var id = parts.Length >= 3 && ushort.TryParse(parts[2], out var value) ? value : (ushort)0;
-            probe.Set(parts[1], id);
-            ChatGui.Print($"[Suzume] probe = {parts[1]} {id}");
-            return;
+            case "on":
+            case "off":
+                config.Enabled = parts[0] == "on";
+                config.Save();
+                ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
+                return;
+            case "probe" when parts.Length >= 2:
+                var id = parts.Length >= 3 && ushort.TryParse(parts[2], out var value) ? value : (ushort)0;
+                probe.Set(parts[1], id);
+                ChatGui.Print($"[Suzume] probe = {parts[1]} {id}");
+                return;
+            default:
+                ChatGui.Print($"[Suzume] {probe.Describe()}");
+                return;
         }
-
-        ChatGui.Print($"[Suzume] {probe.Describe()}");
     }
 
     public void Dispose()
     {
         CommandManager.RemoveHandler(CommandName);
-        Framework.Update -= probe.OnUpdate;
+        Framework.Update -= OnUpdate;
         PluginInterface.UiBuilder.Draw -= OnDraw;
         PluginInterface.UiBuilder.OpenConfigUi -= configWindow.Toggle;
         PluginInterface.UiBuilder.OpenMainUi -= configWindow.Toggle;
         windowSystem.RemoveAllWindows();
         probe.Release();
+        controller.Dispose();
         chirpPlayer?.Dispose();
     }
 }
