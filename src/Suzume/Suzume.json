@@ -1,0 +1,7 @@
+{
+  "Author": "Suzume",
+  "Name": "Suzume",
+  "Punchline": "ミニオン「タビスズメ」を本物のスズメらしく動かし、鳴かせます。",
+  "Description": "自分のタビスズメが、両足ホップ・キョロキョロ・ついばみ・波状飛行で動き、行動に合わせて鳴きます。\n/suzume で設定画面を開きます。",
+  "Tags": [ "minion", "companion" ]
+}

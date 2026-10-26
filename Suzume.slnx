@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Suzume/Suzume.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+</Solution>
