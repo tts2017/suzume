@@ -5,4 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Suzume.Core\Suzume.Core.csproj" />
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\sounds\*.wav" LogicalName="Suzume.Sounds.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
