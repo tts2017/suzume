@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Penumbra.GameData は新しい形式のモデル (.mdl) を読むために使う。インストール済みの Penumbra から参照する -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>MSB3277</NoWarn>
+    <DalamudDev>$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudDev>
+    <PenumbraDir>$([System.IO.Directory]::GetDirectories('$(AppData)\XIVLauncher\installedPlugins\Penumbra')[0])\</PenumbraDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Penumbra.GameData"><HintPath>$(PenumbraDir)Penumbra.GameData.dll</HintPath></Reference>
+    <Reference Include="Penumbra.String"><HintPath>$(PenumbraDir)Penumbra.String.dll</HintPath></Reference>
+    <Reference Include="Luna"><HintPath>$(PenumbraDir)Luna.dll</HintPath></Reference>
+    <Reference Include="Dalamud"><HintPath>$(DalamudDev)Dalamud.dll</HintPath></Reference>
+    <Reference Include="Lumina"><HintPath>$(DalamudDev)Lumina.dll</HintPath></Reference>
+    <Reference Include="Lumina.Excel"><HintPath>$(DalamudDev)Lumina.Excel.dll</HintPath></Reference>
+    <Reference Include="FFXIVClientStructs"><HintPath>$(DalamudDev)FFXIVClientStructs.dll</HintPath></Reference>
+    <Reference Include="InteropGenerator.Runtime"><HintPath>$(DalamudDev)InteropGenerator.Runtime.dll</HintPath></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(DalamudDev)Newtonsoft.Json.dll</HintPath></Reference>
+  </ItemGroup>
+
+</Project>
