@@ -1,4 +1,3 @@
-using System.Numerics;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -7,55 +6,40 @@ using Suzume.Core;
 
 namespace Suzume;
 
-/// <summary>毎フレーム SparrowBrain を進め、結果をミニオンの見た目と音に反映する。</summary>
+/// <summary>
+/// 周りのタビスズメを見つけ、1 羽ずつ SparrowAgent で動かす。自分のスズメに加え、設定によっては他人のスズメも。
+/// </summary>
 public sealed unsafe class SparrowController : IDisposable
 {
     // これだけ続けて例外が出たら自動で無効化する
     private const int MaxConsecutiveErrors = 10;
-    // 手まねきする (/beckon) で再生される ActionTimeline (emote/comeon)
-    private const ushort BeckonTimelineId = 697;
-    // GameObject.Height が取れないときの頭の高さ
-    private const float FallbackHeadHeight = 1.7f;
-    // スズメを驚かせる攻撃的なエモートの ActionTimeline:
-    // 不満を表す /angry, 怒る /furious, 平手打ち /slap, 戦いに備える /battlestance,
-    // 格闘訓練 /box, 地団駄を踏む /stomp, 投げる /throw
-    private static readonly HashSet<ushort> AggressiveTimelineIds = [690, 639, 691, 664, 3752, 3755, 3778, 5809, 5814, 8179, 641];
-    // 「スズメに向けて」とみなす範囲: ターゲットしているか、前方この距離・角度以内
-    private const float ThreatDistance = 6f;
-    private const float ThreatHalfAngleDeg = 40f;
 
     private readonly Configuration config;
     private readonly ChirpPlayer? chirpPlayer;
     private readonly BonePoser bonePoser;
-    private readonly SparrowParams parameters = new();
-    private readonly SparrowBrain brain;
-    private readonly ChirpScheduler scheduler;
-    private readonly PoseApplier applier = new();
-    private readonly GroundTracker ground = new();
-    private readonly RisingEdge beckon = new();
-    private readonly RisingEdge aggression = new();
-    private readonly HeadLocator headLocator = new();
     private readonly GroundProbe groundProbe = new();
-    // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
-    private readonly ushort[] lastPlayerTimelines = new ushort[3];
-    private Vector3? lastPlayerPosition;
-    // 調査用: 高さの記録を 1 秒ごとに出す
-    private long lastHeightLog;
+    private readonly RisingEdge localAggression = new();
+    // 持ち主の EntityId ごとのスズメ
+    private readonly Dictionary<uint, SparrowAgent> agents = new();
     private int consecutiveErrors;
+    // 調査用: 見つけた数が変わったらログに出す
+    private (int All, int Own) lastFoundCount;
 
     public SparrowController(Configuration config, ChirpPlayer? chirpPlayer, BonePoser bonePoser)
     {
         this.config = config;
         this.chirpPlayer = chirpPlayer;
         this.bonePoser = bonePoser;
-        var random = new SeededRandom(Environment.TickCount);
-        brain = new SparrowBrain(parameters, random, groundProbe.GroundAt);
-        scheduler = new ChirpScheduler(parameters, random);
     }
 
-    public bool Active { get; private set; }
-    public SparrowPose LastPose { get; private set; }
-    public Vector3 LastTarget { get; private set; }
+    private SparrowAgent? OwnAgent =>
+        Plugin.ObjectTable.LocalPlayer is { } local && agents.TryGetValue(local.EntityId, out var agent) ? agent : null;
+
+    /// <summary>自分のスズメを動かしているか。</summary>
+    public bool Active => OwnAgent?.Active == true;
+    public SparrowPose LastPose => OwnAgent?.LastPose ?? default;
+    public System.Numerics.Vector3 LastTarget => OwnAgent?.LastTarget ?? default;
+    public int ActiveCount => agents.Values.Count(x => x.Active);
 
     public void Update(IFramework framework)
     {
@@ -67,7 +51,7 @@ public sealed unsafe class SparrowController : IDisposable
         catch (Exception ex)
         {
             Plugin.Log.Error(ex, "タビスズメの更新に失敗しました");
-            ReleaseIfActive();
+            Suspend();
             if (++consecutiveErrors >= MaxConsecutiveErrors)
             {
                 config.Enabled = false;
@@ -78,162 +62,100 @@ public sealed unsafe class SparrowController : IDisposable
         }
     }
 
-    /// <summary>描画直前の書き込み(PoseApplier が Draw モードのときの前傾)。</summary>
+    /// <summary>描画直前の書き込み(PoseApplier が Draw モードのときの前傾)。自分のスズメだけ。</summary>
     public void OnDraw()
     {
-        if (!Active)
-            return;
-
         var minion = MinionTracker.FindSparrow(out _);
         if (minion != null)
-            applier.ApplyLate(minion, LastPose);
+            OwnAgent?.ApplyLate(minion);
     }
 
-    /// <summary>スズメをプレイヤーのそばの地面に置き直す(地面に埋まったときなどの逃げ道)。</summary>
-    public void ResetPosition() => brain.Invalidate();
+    /// <summary>自分のスズメをそばの地面に置き直す(地面に埋まったときなどの逃げ道)。</summary>
+    public void ResetPosition() => OwnAgent?.ResetPosition();
 
-    /// <summary>確認用: 次に地上で落ち着いたとき砂浴びを始めさせる。</summary>
-    public void RequestDustBath() => brain.RequestDustBath();
+    /// <summary>確認用: 自分のスズメに、次に地上で落ち着いたとき砂浴びを始めさせる。</summary>
+    public void RequestDustBath() => OwnAgent?.RequestDustBath();
 
-    /// <summary>確認用: 次に地上で落ち着いたとき毛づくろいを始めさせる。</summary>
-    public void RequestPreen() => brain.RequestPreen();
+    /// <summary>確認用: 自分のスズメに、次に地上で落ち着いたとき毛づくろいを始めさせる。</summary>
+    public void RequestPreen() => OwnAgent?.RequestPreen();
 
-    /// <summary>上書きをやめ、次に有効になったとき目標地点から始め直す。</summary>
+    /// <summary>すべてのスズメの上書きをやめる。</summary>
     public void Suspend()
     {
-        ReleaseIfActive();
-        brain.Invalidate();
-        ground.Reset();
-        beckon.Reset();
-        aggression.Reset();
-        lastPlayerPosition = null;
+        foreach (var found in MinionTracker.FindAllSparrows())
+        {
+            if (agents.TryGetValue(found.OwnerId, out var agent))
+                agent.Suspend((Companion*)found.Minion);
+        }
+
+        agents.Clear();
+        bonePoser.Clear();
+        localAggression.Reset();
     }
 
     private void Step(float dt)
     {
-        Character* owner = null;
-        var minion = config.Enabled && !IsSuspendedByGame() ? MinionTracker.FindSparrow(out owner) : null;
-        if (minion == null || ((GameObject*)minion)->DrawObject == null)
+        var local = Plugin.ObjectTable.LocalPlayer;
+        if (!config.Enabled || IsSuspendedByGame() || local == null)
         {
             Suspend();
             return;
         }
 
-        var player = (GameObject*)owner;
-        var playerPosition = player->Position;
-        var playerVelocity = lastPlayerPosition is { } last && dt > 0f ? Vector3.Subtract(playerPosition, last) / dt : Vector3.Zero;
-        lastPlayerPosition = playerPosition;
+        var localCharacter = (Character*)local.Address;
+        var localPlayer = (GameObject*)localCharacter;
+        var localJumping = Plugin.Condition[ConditionFlag.Jumping] || Plugin.Condition[ConditionFlag.Jumping61];
+        var localMounted = Plugin.Condition[ConditionFlag.Mounted];
+        // 地面の当たり判定と見た目の差は、自分のキャラクターで測る
+        groundProbe.ReferenceY = localPlayer->Position.Y;
+        groundProbe.Calibrate(localPlayer->Position, grounded: !localJumping && !localMounted);
 
-        // タビスズメの論理位置は宙に浮いているので、プレイヤーの足元から地上の目標地点を決める
-        var jumping = Plugin.Condition[ConditionFlag.Jumping] || Plugin.Condition[ConditionFlag.Jumping61];
-        var feet = playerPosition with { Y = ground.Update(playerPosition.Y, jumping) };
-        // 目標地点の高さは、その場所の地面をレイキャストで調べる(斜面でプレイヤーの足元と違うため)
-        groundProbe.ReferenceY = feet.Y;
-        groundProbe.Calibrate(playerPosition, grounded: !jumping && !Plugin.Condition[ConditionFlag.Mounted]);
-        var target = FollowTarget.For(feet, player->Rotation);
-        if (groundProbe.GroundAt(target) is { } targetGround)
-            target.Y = targetGround;
+        var frame = new FrameContext(
+            dt,
+            localPlayer->Position,
+            localPlayer->Rotation,
+            localAggression.Update(SparrowAgent.IsAggressive(localCharacter)),
+            localJumping,
+            localMounted);
 
-        parameters.FlyDistance = config.FlyDistance;
-        parameters.ChirpFrequency = config.ChirpFrequency;
-
-        var head = HeadPosition(player, playerPosition);
-        LogPlayerTimelineChanges(owner);
-        var beckoned = beckon.Update(IsBeckoning(owner));
-        var threatened = aggression.Update(IsAggressive(owner))
-            && (IsTargeted(minion) || Facing.IsInFront(playerPosition, player->Rotation, LastPose.Position, ThreatDistance, ThreatHalfAngleDeg));
-        if (threatened)
-            Plugin.Log.Debug($"攻撃的なエモートを検出 (状態 {LastPose.State})");
-        if (beckoned)
-            Plugin.Log.Debug($"手まねきを検出 (状態 {LastPose.State}) Height={player->Height:F2} 頭={head:F2}");
-
-        var pose = brain.Tick(new SparrowInput(
-            dt, target, player->Rotation, playerPosition, playerVelocity, Plugin.Condition[ConditionFlag.Mounted],
-            head, beckoned, jumping, threatened));
-        if (pose.State != LastPose.State)
-            Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
-        applier.Apply(minion, pose);
-        bonePoser.Pose = pose;
-        LogHeights((GameObject*)minion, pose, playerPosition);
-        Active = true;
-        LastPose = pose;
-        LastTarget = target;
-
-        var chirp = scheduler.Update(dt, pose.State, pose.Triggers);
-        if (chirp is { } kind && config.SoundEnabled && chirpPlayer != null)
-            chirpPlayer.Play(kind, ChirpVolume.Compute(config.Volume, Vector3.Distance(playerPosition, pose.Position)));
-    }
-
-    /// <summary>頭頂の位置。骨格から読み、読めなければ GameObject.Height で代用する。設定の補正を足す。</summary>
-    private Vector3 HeadPosition(GameObject* player, Vector3 playerPosition)
-    {
-        var head = headLocator.Find(player)
-            ?? playerPosition with { Y = playerPosition.Y + (player->Height is > 0.5f and < 4f ? player->Height : FallbackHeadHeight) };
-        return head with { Y = head.Y + config.HeadOffset };
-    }
-
-    /// <summary>プレイヤーが手まねきのエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>
-    private static bool IsBeckoning(Character* owner)
-    {
-        var sequencer = &owner->Timeline.TimelineSequencer;
-        return sequencer->GetSlotTimeline(0) == BeckonTimelineId
-            || sequencer->GetSlotTimeline(1) == BeckonTimelineId;
-    }
-
-    /// <summary>調査用: プレイヤーのアニメが変わったらログに出す(手まねきの検出確認)。</summary>
-    private void LogPlayerTimelineChanges(Character* owner)
-    {
-        var sequencer = &owner->Timeline.TimelineSequencer;
-        for (var slot = 0u; slot < lastPlayerTimelines.Length; slot++)
+        var seen = new HashSet<uint>();
+        var allFound = MinionTracker.FindAllSparrows();
+        var count = (allFound.Count, allFound.Count(x => x.IsLocal));
+        if (count != lastFoundCount)
         {
-            var id = sequencer->GetSlotTimeline(slot);
-            if (id == lastPlayerTimelines[slot])
-                continue;
-
-            lastPlayerTimelines[slot] = id;
-            Plugin.Log.Debug($"プレイヤー slot{slot} = {id}");
+            lastFoundCount = count;
+            Plugin.Log.Debug($"タビスズメ {count.Item1} 羽 (自分 {count.Item2} 羽): "
+                + string.Join(", ", allFound.Select(x => $"[{x.ObjectIndex}] 持ち主 {x.OwnerId:X}{(x.IsLocal ? " (自分)" : "")} OwnerId={((GameObject*)x.Minion)->OwnerId:X}")));
         }
-    }
 
-    /// <summary>調査用: 計算した高さ・地面・実際の描画位置を 1 秒ごとにログに出す(地面に埋まる問題の調査)。</summary>
-    private void LogHeights(GameObject* go, in SparrowPose pose, Vector3 playerPosition)
-    {
-        var now = Environment.TickCount64;
-        if (now - lastHeightLog < 1000)
-            return;
+        foreach (var found in allFound)
+        {
+            var minion = (Companion*)found.Minion;
+            seen.Add(found.OwnerId);
+            if (!agents.TryGetValue(found.OwnerId, out var agent))
+            {
+                agent = new SparrowAgent(config, chirpPlayer, groundProbe, unchecked((int)found.OwnerId ^ Environment.TickCount));
+                agents[found.OwnerId] = agent;
+            }
 
-        lastHeightLog = now;
-        var ground = groundProbe.GroundAt(pose.Position);
-        var drawn = go->DrawObject != null ? go->DrawObject->Object.Position.Y : float.NaN;
-        Plugin.Log.Debug(
-            $"高さ {pose.State}: 計算 {pose.Position.Y:F2} 地面 {(ground is { } g ? g.ToString("F2") : "なし")} "
-            + $"プレイヤー {playerPosition.Y:F2} ミニオン {go->Position.Y:F2} オフセット {go->DrawOffset.Y:F2} 描画 {drawn:F2}");
-    }
+            // 他人のスズメは設定で切り替える。自分が空を飛ぶ・水中にいるときは自分のスズメを止める
+            var skip = found.IsLocal ? IsLocalAirborneOrInWater() : !config.IncludeOthers;
+            var pose = skip ? null : agent.Step(minion, (Character*)found.Owner, found.IsLocal, frame);
+            if (pose is { } p)
+            {
+                bonePoser.SetPose(found.ObjectIndex, found.Minion, p);
+            }
+            else
+            {
+                agent.Suspend(minion);
+                bonePoser.Remove(found.ObjectIndex);
+            }
+        }
 
-    /// <summary>プレイヤーが攻撃的なエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>
-    private static bool IsAggressive(Character* owner)
-    {
-        var sequencer = &owner->Timeline.TimelineSequencer;
-        return AggressiveTimelineIds.Contains(sequencer->GetSlotTimeline(0))
-            || AggressiveTimelineIds.Contains(sequencer->GetSlotTimeline(1));
-    }
-
-    private static bool IsTargeted(Companion* minion)
-    {
-        var target = Plugin.TargetManager.Target;
-        return target != null && target.Address == (nint)minion;
-    }
-
-    private void ReleaseIfActive()
-    {
-        if (!Active)
-            return;
-
-        Active = false;
-        bonePoser.Clear();
-        var minion = MinionTracker.FindSparrow(out _);
-        if (minion != null)
-            applier.Release(minion);
+        // いなくなったスズメ (しまわれた・遠くへ行った) は忘れる。オブジェクトはもうないので書き戻しは要らない
+        foreach (var gone in agents.Keys.Where(id => !seen.Contains(id)).ToList())
+            agents.Remove(gone);
+        bonePoser.RemoveMissing();
     }
 
     /// <summary>制御が動かないときの調査用。止めている条件を並べる。</summary>
@@ -244,15 +166,16 @@ public sealed unsafe class SparrowController : IDisposable
             reasons.Add("設定で無効");
         if (Plugin.ClientState.IsGPosing)
             reasons.Add("GPose");
-        foreach (var flag in SuspendFlags)
+        foreach (var flag in SuspendFlags.Concat(LocalAirFlags))
         {
             if (Plugin.Condition[flag])
                 reasons.Add(flag.ToString());
         }
 
-        return $"Active={Active} 停止理由=[{string.Join(", ", reasons)}] 連続エラー={consecutiveErrors}";
+        return $"Active={Active} 動かしている数={ActiveCount} 停止理由=[{string.Join(", ", reasons)}] 連続エラー={consecutiveErrors}";
     }
 
+    // 演出中・移動中は、全部のスズメをゲーム本来の動きに任せる
     private static readonly ConditionFlag[] SuspendFlags =
     [
         ConditionFlag.BetweenAreas,
@@ -260,22 +183,20 @@ public sealed unsafe class SparrowController : IDisposable
         ConditionFlag.OccupiedInCutSceneEvent,
         ConditionFlag.WatchingCutscene,
         ConditionFlag.WatchingCutscene78,
+    ];
+
+    // 自分が飛行・水中にいるときは地面が分からないので、自分のスズメだけゲーム本来の動きに任せる
+    private static readonly ConditionFlag[] LocalAirFlags =
+    [
         ConditionFlag.InFlight,
         ConditionFlag.Swimming,
         ConditionFlag.Diving,
     ];
 
-    // 地面の高さが分からない(飛行・水中)ときと、演出中はゲーム本来の動きに任せる
     private static bool IsSuspendedByGame() =>
-        Plugin.ClientState.IsGPosing
-        || Plugin.Condition[ConditionFlag.BetweenAreas]
-        || Plugin.Condition[ConditionFlag.BetweenAreas51]
-        || Plugin.Condition[ConditionFlag.OccupiedInCutSceneEvent]
-        || Plugin.Condition[ConditionFlag.WatchingCutscene]
-        || Plugin.Condition[ConditionFlag.WatchingCutscene78]
-        || Plugin.Condition[ConditionFlag.InFlight]
-        || Plugin.Condition[ConditionFlag.Swimming]
-        || Plugin.Condition[ConditionFlag.Diving];
+        Plugin.ClientState.IsGPosing || SuspendFlags.Any(flag => Plugin.Condition[flag]);
 
-    public void Dispose() => ReleaseIfActive();
+    private static bool IsLocalAirborneOrInWater() => LocalAirFlags.Any(flag => Plugin.Condition[flag]);
+
+    public void Dispose() => Suspend();
 }

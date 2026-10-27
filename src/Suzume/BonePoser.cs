@@ -11,7 +11,7 @@ using Suzume.Core;
 namespace Suzume;
 
 /// <summary>
-/// タビスズメのボーン (翼・首・尾) を直接動かす。ゲームのアニメ更新 (Skeleton.UpdateAnimations) の直後に書き込む
+/// タビスズメ (複数羽) のボーン (翼・首・尾) を直接動かす。ゲームのアニメ更新 (Skeleton.UpdateAnimations) の直後に書き込む
 /// (更新処理や描画直前で書いても、アニメに上書きされて描画に残らないことをスパイクで確認した)。
 /// </summary>
 public sealed unsafe class BonePoser : IDisposable
@@ -25,8 +25,11 @@ public sealed unsafe class BonePoser : IDisposable
     private static readonly string[] BoneNames = [LeftWing, LeftWingTip, RightWing, RightWingTip, Neck, Tail];
 
     private readonly Hook<Skeleton.Delegates.UpdateAnimations>? updateHook;
-    private readonly Dictionary<string, int> boneIndex = new();
-    private hkaSkeleton* indexedSkeleton;
+    // オブジェクト番号ごとの、書き込むポーズ (書き込む直前に同じスズメかを確かめる)
+    private readonly Dictionary<ushort, (nint Minion, SparrowPose Pose)> poses = new();
+    private readonly object gate = new();
+    // 骨格ごとのボーン番号 (タビスズメはどれも同じ骨格なので、たいてい 1 つ)
+    private readonly Dictionary<nint, Dictionary<string, int>> boneIndexBySkeleton = new();
 
     public BonePoser()
     {
@@ -42,9 +45,36 @@ public sealed unsafe class BonePoser : IDisposable
     }
 
     /// <summary>毎フレーム制御側が入れる。すべて 0 ならアニメのまま。</summary>
-    public SparrowPose Pose { get; set; }
+    public void SetPose(ushort objectIndex, nint minion, in SparrowPose pose)
+    {
+        lock (gate)
+            poses[objectIndex] = (minion, pose);
+    }
 
-    public void Clear() => Pose = default;
+    public void Remove(ushort objectIndex)
+    {
+        lock (gate)
+            poses.Remove(objectIndex);
+    }
+
+    /// <summary>もうそこにいないスズメのポーズを捨てる。</summary>
+    public void RemoveMissing()
+    {
+        lock (gate)
+        {
+            foreach (var index in poses.Keys.Where(index => !IsSameObject(index, poses[index].Minion)).ToList())
+                poses.Remove(index);
+        }
+    }
+
+    public void Clear()
+    {
+        lock (gate)
+            poses.Clear();
+    }
+
+    private static bool IsSameObject(ushort objectIndex, nint minion) =>
+        Plugin.ObjectTable[objectIndex] is { } obj && obj.Address == minion;
 
     private static bool HasBoneWork(in SparrowPose pose) =>
         pose.WingSpread != 0f || pose.WingFlap != 0f || pose.NeckYaw != 0f || pose.NeckPitch != 0f || pose.NeckRoll != 0f || pose.TailLift != 0f;
@@ -52,28 +82,30 @@ public sealed unsafe class BonePoser : IDisposable
     private void UpdateAnimationsDetour(Skeleton* first, float deltaTime)
     {
         updateHook!.Original(first, deltaTime);
-        var pose = Pose;
-        if (!HasBoneWork(pose))
-            return;
 
-        try
+        (ushort Index, nint Minion, SparrowPose Pose)[] work;
+        lock (gate)
+            work = poses.Where(x => HasBoneWork(x.Value.Pose)).Select(x => (x.Key, x.Value.Minion, x.Value.Pose)).ToArray();
+
+        foreach (var (index, minion, pose) in work)
         {
-            Apply(pose);
-        }
-        catch (Exception ex)
-        {
-            Clear();
-            Plugin.Log.Error(ex, "ボーンの書き込みに失敗しました");
+            try
+            {
+                // 消えたスズメのメモリには触らない
+                if (IsSameObject(index, minion))
+                    Apply((GameObject*)minion, pose);
+            }
+            catch (Exception ex)
+            {
+                Remove(index);
+                Plugin.Log.Error(ex, "ボーンの書き込みに失敗しました");
+            }
         }
     }
 
-    private void Apply(in SparrowPose sparrow)
+    private void Apply(GameObject* minion, in SparrowPose sparrow)
     {
-        var minion = MinionTracker.FindSparrow(out _);
-        if (minion == null)
-            return;
-
-        var draw = ((GameObject*)minion)->DrawObject;
+        var draw = minion->DrawObject;
         if (draw == null || draw->Object.GetObjectType() != FFXIVClientStructs.FFXIV.Client.Graphics.Scene.ObjectType.CharacterBase)
             return;
 
@@ -85,7 +117,7 @@ public sealed unsafe class BonePoser : IDisposable
         if (pose == null || pose->Skeleton == null)
             return;
 
-        IndexBones(pose->Skeleton);
+        var boneIndex = IndexBones(pose->Skeleton);
 
         // 先にアニメ計算後のモデル空間の形から新しい局所回転をすべて求め、あとでまとめて書き込む
         var model = pose->AccessSyncedPoseModelSpace();
@@ -95,9 +127,9 @@ public sealed unsafe class BonePoser : IDisposable
         {
             // WingSide: 0 は両方、負は左だけ、正は右だけ
             if (sparrow.WingSide <= 0f)
-                AddWing(pose, model, LeftWing, LeftWingTip, sparrow, writes);
+                AddWing(pose, model, boneIndex, LeftWing, LeftWingTip, sparrow, writes);
             if (sparrow.WingSide >= 0f)
-                AddWing(pose, model, RightWing, RightWingTip, sparrow, writes);
+                AddWing(pose, model, boneIndex, RightWing, RightWingTip, sparrow, writes);
         }
 
         if ((sparrow.NeckYaw != 0f || sparrow.NeckPitch != 0f || sparrow.NeckRoll != 0f) && boneIndex.TryGetValue(Neck, out var neck))
@@ -119,8 +151,8 @@ public sealed unsafe class BonePoser : IDisposable
         pose->AccessSyncedPoseModelSpace();
     }
 
-    private void AddWing(hkaPose* pose, FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model,
-        string root, string tip, in SparrowPose sparrow, List<(int Bone, Quaternion Rotation)> writes)
+    private static void AddWing(hkaPose* pose, FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model,
+        Dictionary<string, int> boneIndex, string root, string tip, in SparrowPose sparrow, List<(int Bone, Quaternion Rotation)> writes)
     {
         if (!boneIndex.TryGetValue(root, out var rootIndex) || !boneIndex.TryGetValue(tip, out var tipIndex))
             return;
@@ -144,12 +176,12 @@ public sealed unsafe class BonePoser : IDisposable
 
     private static Vector3 ToVector(hkVector4f v) => new(v.X, v.Y, v.Z);
 
-    private void IndexBones(hkaSkeleton* skeleton)
+    private Dictionary<string, int> IndexBones(hkaSkeleton* skeleton)
     {
-        if (skeleton == indexedSkeleton)
-            return;
+        if (boneIndexBySkeleton.TryGetValue((nint)skeleton, out var known))
+            return known;
 
-        boneIndex.Clear();
+        var boneIndex = new Dictionary<string, int>();
         for (var bone = 0; bone < skeleton->Bones.Length; bone++)
         {
             var name = skeleton->Bones[bone].Name.String;
@@ -157,8 +189,9 @@ public sealed unsafe class BonePoser : IDisposable
                 boneIndex[name] = bone;
         }
 
-        indexedSkeleton = skeleton;
+        boneIndexBySkeleton[(nint)skeleton] = boneIndex;
         Plugin.Log.Debug($"ボーン: {string.Join(", ", boneIndex.Select(x => $"{x.Key}={x.Value}"))}");
+        return boneIndex;
     }
 
     public void Dispose() => updateHook?.Dispose();

@@ -37,6 +37,13 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var includeOthers = config.IncludeOthers;
+        if (ImGui.Checkbox("他の人のタビスズメにも適用", ref includeOthers))
+        {
+            config.IncludeOthers = includeOthers;
+            changed = true;
+        }
+
         var sound = config.SoundEnabled;
         if (ImGui.Checkbox("鳴き声", ref sound))
         {

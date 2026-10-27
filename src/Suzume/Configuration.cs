@@ -8,6 +8,8 @@ public sealed class Configuration : IPluginConfiguration
     public int Version { get; set; } = 1;
 
     public bool Enabled { get; set; } = true;
+    // 他の人のタビスズメも、あなたの画面の中でリアルに動かす
+    public bool IncludeOthers { get; set; } = true;
     public bool SoundEnabled { get; set; } = true;
     public float Volume { get; set; } = 0.6f;
     public float ChirpFrequency { get; set; } = 1.0f;

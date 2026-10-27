@@ -90,7 +90,8 @@ public sealed class Plugin : IDalamudPlugin
 
         var pose = controller.LastPose;
         var gap = Angles.HorizontalDistance(pose.Position, controller.LastTarget);
-        return $"状態: {pose.State} / アニメ: {pose.Anim}\n"
+        return $"動かしている数: {controller.ActiveCount}\n"
+            + $"状態: {pose.State} / アニメ: {pose.Anim}\n"
             + $"見た目の位置: {pose.Position:F2}\n"
             + $"目標地点: {controller.LastTarget:F2}\n"
             + $"差: {gap:F2} y";

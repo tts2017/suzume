@@ -3,10 +3,43 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace Suzume;
 
-/// <summary>ローカルプレイヤーが呼び出しているタビスズメを探す。</summary>
+/// <summary>タビスズメを探す。自分のものだけ、または周りの全員のもの。</summary>
 public static unsafe class MinionTracker
 {
     public const ushort SparrowCompanionId = 247;
+
+    /// <summary>見つけたタビスズメと、その持ち主。</summary>
+    public readonly record struct Found(nint Minion, nint Owner, ushort ObjectIndex, uint OwnerId, bool IsLocal);
+
+    /// <summary>周りのタビスズメを、持ち主が分かるものだけすべて返す。</summary>
+    public static List<Found> FindAllSparrows()
+    {
+        var found = new List<Found>();
+        var local = Plugin.ObjectTable.LocalPlayer;
+        var localAddress = local?.Address ?? 0;
+        var localChild = local != null ? (nint)((Character*)local.Address)->ChildObject : 0;
+        foreach (var obj in Plugin.ObjectTable)
+        {
+            var go = (GameObject*)obj.Address;
+            if (go == null || go->ObjectKind != ObjectKind.Companion || go->BaseId != SparrowCompanionId || go->DrawObject == null)
+                continue;
+
+            // 持ち主はミニオン自身が持つポインタを優先し、なければ OwnerId から探す
+            var owner = (nint)((Companion*)go)->Owner;
+            if (owner == 0)
+                owner = Plugin.ObjectTable.SearchByEntityId(go->OwnerId)?.Address ?? 0;
+            if (owner == 0)
+                continue;
+
+            var isLocal = owner == localAddress || obj.Address == localChild;
+            if (isLocal)
+                owner = localAddress;
+            var ownerId = ((GameObject*)owner)->EntityId;
+            found.Add(new Found(obj.Address, owner, go->ObjectIndex, ownerId, isLocal));
+        }
+
+        return found;
+    }
 
     /// <summary>タビスズメが出ていなければ null。owner はプレイヤーがいれば常に設定する。</summary>
     public static Companion* FindSparrow(out Character* owner)
