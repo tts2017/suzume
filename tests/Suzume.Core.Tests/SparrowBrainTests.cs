@@ -65,34 +65,20 @@ public class SparrowBrainTests
     }
 
     [Fact]
-    public void YawNeverChangesMidHop()
-    {
-        var brain = NewBrain();
-        brain.Tick(Input(Vector3.Zero));
-
-        var poses = Run(brain, Input(new Vector3(0f, 0f, 3f)), 10f);
-
-        foreach (var (prev, next) in poses.Zip(poses.Skip(1)))
-        {
-            var midAir = prev.Position.Y > 1e-4f && next.Position.Y > 1e-4f;
-            if (midAir)
-                Assert.Equal(prev.Yaw, next.Yaw);
-        }
-    }
-
-    [Fact]
-    public void LooksAroundWithInstantTurnsWhileIdle()
+    public void LooksAroundWithQuickTurnsWhileIdle()
     {
         var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity, ForageChance = 0f, PreenChance = 0f };
         var brain = NewBrain(p);
 
         var poses = Run(brain, Input(Vector3.Zero), 5f);
 
-        var minSnap = Angles.DegToRad(p.ScanAngleMinDeg) - 1e-3f;
-        var snaps = poses.Zip(poses.Skip(1)).Count(pair =>
-            MathF.Abs(Angles.Wrap(pair.Second.Yaw - pair.First.Yaw)) >= minSnap);
-        Assert.True(snaps >= 3, $"snaps={snaps}");
-        Assert.All(poses, x => Assert.Equal(Vector3.Zero, x.Position));
+        // 0.25 秒ごとに見て、大きく向きが変わっている回数を数える
+        var samples = poses.Where((_, i) => i % 15 == 0).ToList();
+        var turns = samples.Zip(samples.Skip(1)).Count(pair =>
+            MathF.Abs(Angles.Wrap(pair.Second.Yaw - pair.First.Yaw)) >= Angles.DegToRad(p.ScanAngleMinDeg) * 0.8f);
+        Assert.True(turns >= 3, $"turns={turns}");
+        // その場で向きを変える(水平には動かない)
+        Assert.All(poses, x => Assert.Equal(0f, Angles.HorizontalDistance(x.Position, Vector3.Zero), 4));
     }
 
     [Fact]
@@ -145,7 +131,7 @@ public class SparrowBrainTests
 
         var poses = Run(brain, Input(target), 10f);
 
-        Assert.Equal(0.5f, poses[^1].Position.Y, 3);
+        GroundAssert.OnGround(0.5f, poses[^1]);
         Assert.DoesNotContain(poses, x => x.Anim == SparrowAnim.Fly);
     }
 
@@ -171,7 +157,7 @@ public class SparrowBrainTests
 
         var final = poses[^1];
         Assert.Equal(SparrowAnim.Idle, final.Anim);
-        Assert.Equal(0f, final.Position.Y, 3);
+        GroundAssert.OnGround(0f, final);
         Assert.True(Vector3.Distance(final.Position, target) <= p.ArriveDistance + p.HopDistanceMax);
     }
 
@@ -332,7 +318,7 @@ public class SparrowBrainTests
         var poses = Run(brain, Input(target, target + new Vector3(1.5f, 0f, 0f), Vector3.Zero, mounted: true), 5f);
 
         Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
-        Assert.Equal(target.Y, poses[^1].Position.Y, 3);
+        GroundAssert.OnGround(target.Y, poses[^1]);
     }
 
     [Fact]
@@ -349,7 +335,7 @@ public class SparrowBrainTests
             Assert.True(MathF.Abs(pair.Second.Position.Y - pair.First.Position.Y) < 0.15f,
                 $"{pair.First.Position.Y} -> {pair.Second.Position.Y}"));
         Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
-        Assert.Equal(1.5f, poses[^1].Position.Y, 3);
+        GroundAssert.OnGround(1.5f, poses[^1]);
     }
 
     [Fact]

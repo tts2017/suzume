@@ -23,6 +23,21 @@ public sealed class SparrowParams
     public float ScanAngleMinDeg { get; set; } = 20f;
     public float ScanAngleMaxDeg { get; set; } = 70f;
     public float ArriveDistance { get; set; } = 0.4f;
+    // 向きを変える: この角度以上はその場で小さく跳ねながら回り、それより小さければ素早く回る
+    public float TurnHopThresholdDeg { get; set; } = 30f;
+    public float TurnHopDuration { get; set; } = 0.12f;
+    public float TurnHopHeight { get; set; } = 0.04f;
+    public float TurnQuickDuration { get; set; } = 0.06f;
+    // 向きを変える速さの上限 (度/秒)。大きく回るときはその分だけ時間をかける
+    public float TurnMaxRateDeg { get; set; } = 600f;
+    // ホップの最初のこの割合の間に、跳ぶ方向へ向きを変える
+    public float HopTurnShare { get; set; } = 0.6f;
+    // 飛行中に向きを変える速さの上限 (度/秒)
+    public float FlyTurnRateDeg { get; set; } = 540f;
+    // 前傾・左右の傾き・翼の開きの急な切り替えをなめらかにする時間 (秒)
+    public float PitchSmoothing { get; set; } = 0.04f;
+    public float RollSmoothing { get; set; } = 0.02f;
+    public float WingSpreadSmoothing { get; set; } = 0.08f;
     // この高低差を超えたら、その場で止まらずにホップで合わせる
     public float StepHeight { get; set; } = 0.05f;
     // 1 回のホップで上り下りできる高さ

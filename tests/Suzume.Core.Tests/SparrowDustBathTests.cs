@@ -51,9 +51,9 @@ public class SparrowDustBathTests
         Assert.NotEmpty(bath);
         // 地面に腹を付けたまま (止まり姿勢のアニメ)、翼だけを高速でばたつかせる
         Assert.All(bath, x => Assert.Equal(SparrowAnim.Idle, x.Anim));
-        var fluttering = bath.Where(x => x.WingSpread > 0f).ToList();
+        // 翼は短い時間で開き切り、大きく広げた状態でばたつかせる
+        var fluttering = bath.Where(x => x.WingSpread >= Angles.DegToRad(45f)).ToList();
         Assert.NotEmpty(fluttering);
-        Assert.All(fluttering, x => Assert.True(x.WingSpread >= Angles.DegToRad(45f), "翼を大きく広げる"));
         Assert.Contains(bath, x => x.WingSpread == 0f && x.WingFlap == 0f); // 小休止
         Assert.True(fluttering.Max(x => x.WingFlap) - fluttering.Min(x => x.WingFlap) > Angles.DegToRad(30f), "翼が大きく振れる");
         Assert.Contains(bath, x => x.Position.Y < -0.01f); // 腹ばいに沈む
@@ -81,10 +81,12 @@ public class SparrowDustBathTests
         Assert.All(before, x => Assert.Equal(SparrowAnim.Idle, x.Anim));
         Assert.Contains(before, x => MathF.Abs(x.Roll) > Angles.DegToRad(10f));
         Assert.Equal(SparrowState.Idle, poses[bathEnd].State);
-        Assert.Equal(0f, poses[bathEnd].Roll);
-        Assert.Equal(0f, poses[bathEnd].WingSpread);
-        Assert.Equal(0f, poses[bathEnd].WingFlap);
-        Assert.Equal(0f, poses[bathEnd].Position.Y, 4);
+        // 傾きと翼はなめらかに戻り、0.1 秒後には元どおり
+        var settled = poses[bathEnd + 6];
+        Assert.InRange(settled.Roll, -Angles.DegToRad(1f), Angles.DegToRad(1f));
+        Assert.InRange(settled.WingSpread, 0f, Angles.DegToRad(1f));
+        Assert.InRange(settled.WingFlap, -Angles.DegToRad(1f), Angles.DegToRad(1f));
+        GroundAssert.OnGround(0f, poses[bathEnd]);
     }
 
     [Theory]
@@ -137,10 +139,14 @@ public class SparrowDustBathTests
         var rush = Input(velocity: new Vector3(6f, 0f, 0f), player: bird - new Vector3(1.5f, 0f, 0f));
 
         var pose = brain.Tick(rush);
-
         Assert.Equal(SparrowState.Alarm, pose.State);
-        Assert.Equal(0f, pose.Roll);
         Assert.True(pose.Position.Y >= 0f);
+
+        // 体を擦るのをやめ、傾きはすぐに戻る
+        SparrowPose later = pose;
+        for (var i = 0; i < 12; i++)
+            later = brain.Tick(rush with { PlayerVelocity = Vector3.Zero });
+        Assert.InRange(later.Roll, -Angles.DegToRad(1f), Angles.DegToRad(1f));
     }
 
     [Fact]
@@ -149,9 +155,12 @@ public class SparrowDustBathTests
         var brain = BathingBrain(AlwaysBathe(), out _);
 
         var pose = brain.Tick(Input(perch: true));
-
         Assert.Equal(SparrowState.TakeOff, pose.State);
-        Assert.Equal(0f, pose.Roll);
+
+        SparrowPose later = pose;
+        for (var i = 0; i < 12; i++)
+            later = brain.Tick(Input());
+        Assert.InRange(later.Roll, -Angles.DegToRad(1f), Angles.DegToRad(1f));
     }
 
     [Fact]

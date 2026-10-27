@@ -24,6 +24,20 @@ public sealed class SparrowBrain
     private float roll;
     private float wingSpread;
     private float wingFlap;
+
+    // 向きを変える途中 (ワープせず、なめらかに・大きければ跳ねながら回る)
+    private bool turning;
+    private float turnFrom;
+    private float turnDelta;
+    private float turnTime;
+    private float turnDuration;
+    private float turnHopHeight;
+    private float turnLift;
+
+    // 見た目に出す前傾・傾き・翼の開き (急な切り替えをなめらかにしたもの)
+    private float shownPitch;
+    private float shownRoll;
+    private float shownSpread;
     // 見た目だけ沈める深さ(砂浴びの腹ばい)。position そのものは地面のまま
     private float crouch;
     private SparrowState state;
@@ -152,9 +166,75 @@ public sealed class SparrowBrain
         }
 
         SnapToGround();
+        AdvanceTurn(dt);
         yaw = Angles.Wrap(yaw);
+        SmoothPresentation(dt);
         return CurrentPose();
     }
+
+    // ---- なめらかな向き変え ----
+
+    /// <summary>
+    /// newYaw へ向きを変え始める。duration を省くと角度で決める: 大きければその場で小さく跳ねながら、小さければ素早く回る。
+    /// どの場合も、回る速さは TurnMaxRateDeg を超えない。
+    /// </summary>
+    private void BeginTurn(float newYaw, float? duration = null, bool allowHop = true)
+    {
+        var from = turning ? turnFrom + turnDelta : yaw;
+        var delta = Angles.Wrap(newYaw - from);
+        if (MathF.Abs(delta) < Epsilon)
+            return;
+
+        var big = MathF.Abs(delta) >= Angles.DegToRad(p.TurnHopThresholdDeg);
+        turning = true;
+        turnFrom = yaw;
+        turnDelta = Angles.Wrap(newYaw - yaw);
+        turnTime = 0f;
+        var minimum = MathF.Abs(turnDelta) / Angles.DegToRad(p.TurnMaxRateDeg);
+        turnDuration = MathF.Max(duration ?? (big ? p.TurnHopDuration : p.TurnQuickDuration), minimum);
+        // 跳ねるのは、その場で向きを変えるときだけ(ホップや飛行と重ねない)
+        turnHopHeight = allowHop && duration == null && big ? p.TurnHopHeight : 0f;
+    }
+
+    private void CancelTurn()
+    {
+        turning = false;
+        turnLift = 0f;
+    }
+
+    private void AdvanceTurn(float dt)
+    {
+        if (!turning)
+            return;
+
+        turnTime += dt;
+        var u = MathF.Min(1f, turnTime / turnDuration);
+        yaw = turnFrom + turnDelta * (u * u * (3f - 2f * u));
+        turnLift = turnHopHeight * 4f * u * (1f - u);
+        if (u >= 1f)
+            CancelTurn();
+    }
+
+    /// <summary>前傾・傾き・翼の開きの急な切り替えを、短い時間でなめらかにつなぐ。</summary>
+    private void SmoothPresentation(float dt)
+    {
+        shownPitch = Approach(shownPitch, pitch, dt, p.PitchSmoothing);
+        shownRoll = Approach(shownRoll, roll, dt, p.RollSmoothing);
+        shownSpread = Approach(shownSpread, wingSpread, dt, p.WingSpreadSmoothing);
+    }
+
+    private static float Approach(float shown, float target, float dt, float smoothing)
+    {
+        var next = shown + (target - shown) * MathF.Min(1f, dt / MathF.Max(smoothing, Epsilon));
+        // 0 に戻すときは、十分近づいたらぴったり 0 にする
+        return target == 0f && MathF.Abs(next) < 0.005f ? 0f : next;
+    }
+
+    /// <summary>翼のばたつきは、開き具合に合わせて出し入れする(開いていない翼は振らない)。</summary>
+    private float ShownFlap() =>
+        wingSpread > 0f ? wingFlap * MathF.Min(1f, shownSpread / wingSpread)
+        : p.DustWingSpreadDeg > 0f ? wingFlap * MathF.Min(1f, shownSpread / Angles.DegToRad(p.DustWingSpreadDeg))
+        : 0f;
 
     /// <summary>地上で止まっている間は、足元の地面の高さに合わせる(段差などでずれを残さない)。</summary>
     private void SnapToGround()
@@ -166,13 +246,17 @@ public sealed class SparrowBrain
     }
 
     private SparrowPose CurrentPose() =>
-        new(position - new Vector3(0f, crouch, 0f), yaw, pitch, anim, state, triggers, roll, wingSpread, wingFlap);
+        new(position + new Vector3(0f, turnLift - crouch, 0f), yaw, shownPitch, anim, state, triggers, shownRoll, shownSpread, ShownFlap());
 
     private void Reset(in SparrowInput input)
     {
         initialized = true;
         position = input.Target;
         yaw = Angles.Wrap(input.TargetYaw);
+        CancelTurn();
+        shownPitch = 0f;
+        shownRoll = 0f;
+        shownSpread = 0f;
         hop = null;
         alarmCooldown = 0f;
         perchIntent = false;
@@ -412,9 +496,10 @@ public sealed class SparrowBrain
         if (scanCountdown > 0f)
             return;
 
-        // キョロキョロ: 補間せず一瞬で向きを変える
+        // キョロキョロ: 素早く向きを変える。大きく振り向くときはその場で小さく跳ねる
         var sign = rng.Chance(0.5f) ? 1f : -1f;
-        yaw += sign * Angles.DegToRad(rng.Range(p.ScanAngleMinDeg, p.ScanAngleMaxDeg));
+        // 頭の上では跳ねない
+        BeginTurn(yaw + sign * Angles.DegToRad(rng.Range(p.ScanAngleMinDeg, p.ScanAngleMaxDeg)), allowHop: state != SparrowState.Perched);
         scanCountdown = rng.Range(p.ScanIntervalMin, p.ScanIntervalMax);
     }
 
@@ -472,9 +557,9 @@ public sealed class SparrowBrain
             to.Y = landing;
         }
 
-        // 向きはホップの前に一瞬で変える。跳んでいる間は変えない
+        // 跳びながら、最初のうちに跳ぶ方向へ向きを変える
         if (Angles.HorizontalDistance(position, to) > Epsilon)
-            yaw = Angles.YawTowards(position, to);
+            BeginTurn(Angles.YawTowards(position, to), p.HopDuration * p.HopTurnShare);
 
         hop = new Hop(position, to, rng.Range(p.HopHeightMin, p.HopHeightMax), p.HopDuration);
         hopTime = 0f;
@@ -547,6 +632,7 @@ public sealed class SparrowBrain
     private void EnterPreen()
     {
         SetState(SparrowState.Preen);
+        CancelTurn();
         stateDuration = rng.Range(p.PreenDurationMin, p.PreenDurationMax);
         preenBaseYaw = yaw;
     }
@@ -595,6 +681,7 @@ public sealed class SparrowBrain
         dustBathArmed = false;
         dustBathRequested = false;
         SetState(SparrowState.DustBath);
+        CancelTurn();
         dustBaseYaw = yaw;
         stateDuration = rng.Range(p.DustBathDurationMin, p.DustBathDurationMax);
         shaking = false;
@@ -676,8 +763,9 @@ public sealed class SparrowBrain
         triggers |= SparrowTrigger.TakeOff;
         groundY = position.Y;
         altitude = 0f;
+        CancelTurn();
         if (Angles.HorizontalDistance(position, goal) > Epsilon)
-            yaw = Angles.YawTowards(position, goal);
+            BeginTurn(Angles.YawTowards(position, goal), p.TakeOffDuration);
     }
 
     private void TickTakeOff(in SparrowInput input, float dt)
@@ -815,7 +903,13 @@ public sealed class SparrowBrain
         if (gap <= Epsilon)
             return;
 
-        yaw = Angles.YawTowards(position, target);
+        // 飛んでいる間は、向きを変える速さに上限を付ける(飛び立ちの向き変えが続いていればそれに任せる)
+        if (!turning)
+        {
+            var maxTurn = Angles.DegToRad(p.FlyTurnRateDeg) * dt;
+            yaw += Math.Clamp(Angles.Wrap(Angles.YawTowards(position, target) - yaw), -maxTurn, maxTurn);
+        }
+
         position += delta / gap * MathF.Min(step, gap);
     }
 }

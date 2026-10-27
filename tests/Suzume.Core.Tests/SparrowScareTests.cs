@@ -48,7 +48,7 @@ public class SparrowScareTests
         Assert.True(first.Triggers.HasFlag(SparrowTrigger.Alarm));
         var landed = poses[^1];
         Assert.Equal(SparrowAnim.Idle, landed.Anim);
-        Assert.Equal(0f, landed.Position.Y, 3);
+        GroundAssert.OnGround(0f, landed);
         // プレイヤーと反対 (+X) へ 4y 以上離れる
         Assert.True(landed.Position.X - Player.X >= 2f + p.ScareFleeDistanceMin - p.ArriveDistance - 0.1f,
             $"x={landed.Position.X}");
@@ -96,7 +96,7 @@ public class SparrowScareTests
 
         Assert.Equal(SparrowState.TakeOff, first.State);
         Assert.True(first.Triggers.HasFlag(SparrowTrigger.Alarm));
-        Assert.Equal(0f, poses[^1].Position.Y, 3);
+        GroundAssert.OnGround(0f, poses[^1]);
         Assert.True(Angles.HorizontalDistance(poses[^1].Position, Player) >= p.ScareFleeDistanceMin - p.ArriveDistance - 0.1f);
     }
 }

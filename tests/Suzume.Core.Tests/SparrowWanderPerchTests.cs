@@ -117,6 +117,6 @@ public class SparrowWanderPerchTests
         var poses = Run(brain, _ => Input(), 8f);
 
         Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
-        Assert.Equal(0f, poses[^1].Position.Y, 3);
+        GroundAssert.OnGround(0f, poses[^1]);
     }
 }

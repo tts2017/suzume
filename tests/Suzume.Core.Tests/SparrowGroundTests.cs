@@ -40,7 +40,7 @@ public class SparrowGroundTests
 
         Assert.True(poses.Max(x => Angles.HorizontalDistance(x.Position, Target)) > 0.8f, "動き回っていること");
         Assert.All(poses.Where(x => x.State == SparrowState.Idle), x =>
-            Assert.True(MathF.Abs(x.Position.Y - Slope(x.Position)!.Value) < 0.05f,
+            Assert.True(x.Position.Y - Slope(x.Position)!.Value is > -0.05f and < 0.05f + 0.04f,
                 $"({x.Position.X:F2}, {x.Position.Z:F2}) の高さ {x.Position.Y:F2}、地面 {Slope(x.Position):F2}"));
     }
 
@@ -98,7 +98,7 @@ public class SparrowGroundTests
         Assert.Contains(poses, x => x.State == SparrowState.Fly);
         Assert.All(poses, x => Assert.True(x.Position.Y >= Mound(x.Position)!.Value - 0.01f,
             $"x={x.Position.X:F2} の高さ {x.Position.Y:F2} が地面 {Mound(x.Position)} の下 ({x.State})"));
-        Assert.Equal(0f, poses[^1].Position.Y, 2);
+        GroundAssert.OnGround(0f, poses[^1]);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class SparrowGroundTests
 
         Assert.All(poses, x => Assert.True(x.Position.Y >= Mound(x.Position)!.Value - 0.01f,
             $"x={x.Position.X:F2} の高さ {x.Position.Y:F2} が地面 {Mound(x.Position)} の下 ({x.State})"));
-        Assert.Equal(1.5f, poses[^1].Position.Y, 2);
+        GroundAssert.OnGround(1.5f, poses[^1]);
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class SparrowGroundTests
 
         var grounded = poses.Where(x => x.State is SparrowState.Idle or SparrowState.Forage or SparrowState.Preen).ToList();
         Assert.Contains(grounded, x => x.Position.X > 1.2f); // 段差の上にも行く
-        Assert.All(grounded, x => Assert.True(MathF.Abs(x.Position.Y - Step(x.Position)!.Value) < 0.02f,
-            $"x={x.Position.X:F2} の高さ {x.Position.Y:F2}、地面 {Step(x.Position)}"));
+        // 地面に接している (向きを変えるときに小さく跳ねる分だけは上がってよい)
+        Assert.All(grounded, x => Assert.InRange(x.Position.Y - Step(x.Position)!.Value, -0.02f, p.TurnHopHeight + 0.01f));
     }
 
     [Fact]
@@ -137,6 +137,6 @@ public class SparrowGroundTests
 
         var poses = Run(brain, 20f);
 
-        Assert.All(poses.Where(x => x.State == SparrowState.Idle), x => Assert.Equal(Target.Y, x.Position.Y, 3));
+        Assert.All(poses.Where(x => x.State == SparrowState.Idle), x => Assert.InRange(x.Position.Y - Target.Y, -0.001f, p.TurnHopHeight + 0.001f));
     }
 }
