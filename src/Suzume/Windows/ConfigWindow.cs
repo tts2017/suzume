@@ -63,6 +63,15 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var headOffset = config.HeadOffset;
+        if (ImGui.SliderFloat("頭の高さの補正 (yalm)", ref headOffset, -1f, 1f))
+        {
+            config.HeadOffset = headOffset;
+            changed = true;
+        }
+
+        ImGui.TextDisabled("/beckon (手まねき) で頭に乗り、もう一度で下ります");
+
         ImGui.Separator();
         ImGui.TextUnformatted("試聴");
         foreach (var kind in Enum.GetValues<ChirpKind>())

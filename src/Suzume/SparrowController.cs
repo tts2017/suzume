@@ -12,6 +12,10 @@ public sealed unsafe class SparrowController : IDisposable
 {
     // これだけ続けて例外が出たら自動で無効化する
     private const int MaxConsecutiveErrors = 10;
+    // 手まねきする (/beckon) で再生される ActionTimeline (emote/comeon)
+    private const ushort BeckonTimelineId = 697;
+    // GameObject.Height が取れないときの頭の高さ
+    private const float FallbackHeadHeight = 1.7f;
 
     private readonly Configuration config;
     private readonly ChirpPlayer? chirpPlayer;
@@ -20,6 +24,7 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly ChirpScheduler scheduler;
     private readonly PoseApplier applier = new();
     private readonly GroundTracker ground = new();
+    private readonly RisingEdge beckon = new();
     private Vector3? lastPlayerPosition;
     private int consecutiveErrors;
 
@@ -74,6 +79,7 @@ public sealed unsafe class SparrowController : IDisposable
         ReleaseIfActive();
         brain.Invalidate();
         ground.Reset();
+        beckon.Reset();
         lastPlayerPosition = null;
     }
 
@@ -100,8 +106,12 @@ public sealed unsafe class SparrowController : IDisposable
         parameters.FlyDistance = config.FlyDistance;
         parameters.ChirpFrequency = config.ChirpFrequency;
 
+        var head = playerPosition with { Y = playerPosition.Y + HeadHeight(player) };
+        var beckoned = beckon.Update(IsBeckoning(owner));
+
         var pose = brain.Tick(new SparrowInput(
-            dt, target, player->Rotation, playerPosition, playerVelocity, Plugin.Condition[ConditionFlag.Mounted]));
+            dt, target, player->Rotation, playerPosition, playerVelocity, Plugin.Condition[ConditionFlag.Mounted],
+            head, beckoned, jumping));
         applier.Apply(minion, pose);
         Active = true;
         LastPose = pose;
@@ -110,6 +120,20 @@ public sealed unsafe class SparrowController : IDisposable
         var chirp = scheduler.Update(dt, pose.State, pose.Triggers);
         if (chirp is { } kind && config.SoundEnabled && chirpPlayer != null)
             chirpPlayer.Play(kind, ChirpVolume.Compute(config.Volume, Vector3.Distance(playerPosition, pose.Position)));
+    }
+
+    private float HeadHeight(GameObject* player)
+    {
+        var height = player->Height is > 0.5f and < 4f ? player->Height : FallbackHeadHeight;
+        return height + config.HeadOffset;
+    }
+
+    /// <summary>プレイヤーが手まねきのエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>
+    private static bool IsBeckoning(Character* owner)
+    {
+        var sequencer = &owner->Timeline.TimelineSequencer;
+        return sequencer->GetSlotTimeline(0) == BeckonTimelineId
+            || sequencer->GetSlotTimeline(1) == BeckonTimelineId;
     }
 
     private void ReleaseIfActive()

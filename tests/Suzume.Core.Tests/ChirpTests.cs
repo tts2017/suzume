@@ -49,6 +49,13 @@ public class ChirpSchedulerTests
     }
 
     [Fact]
+    public void ChirpsWhilePerchedOnHead()
+    {
+        var scheduler = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));
+        Assert.Equal(ChirpKind.Contact, scheduler.Update(Dt, SparrowState.Perched, SparrowTrigger.None));
+    }
+
+    [Fact]
     public void SilentWhileFlying()
     {
         var scheduler = new ChirpScheduler(new SparrowParams { ContactRatePerSecond = 1000f }, new SequenceRandom(0f));

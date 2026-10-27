@@ -12,6 +12,8 @@ public enum SparrowState
     Fly,
     Land,
     Alarm,
+    /// <summary>プレイヤーの頭の上に止まっている</summary>
+    Perched,
 }
 
 /// <summary>ゲーム側で再生させるベースアニメーション。</summary>
@@ -45,13 +47,18 @@ public enum SparrowTrigger
 
 /// <param name="Target">スズメが付いていく地上の目標地点(地面の高さ込み)</param>
 /// <param name="TargetYaw">論理位置での向き。置き直すときに使う</param>
+/// <param name="HeadPosition">プレイヤーの頭の上(止まる位置)</param>
+/// <param name="PerchRequested">この Tick で手招きされた(頭に乗る/下りるの切り替え)</param>
 public readonly record struct SparrowInput(
     float Dt,
     Vector3 Target,
     float TargetYaw,
     Vector3 PlayerPosition,
     Vector3 PlayerVelocity,
-    bool PlayerMounted);
+    bool PlayerMounted,
+    Vector3 HeadPosition = default,
+    bool PerchRequested = false,
+    bool PlayerJumping = false);
 
 /// <param name="Position">見た目の位置</param>
 /// <param name="Pitch">前傾角(ラジアン、正で頭が下がる)</param>

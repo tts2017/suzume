@@ -28,6 +28,15 @@ public sealed class SparrowParams
     // 1 回のホップで上り下りできる高さ
     public float MaxHopRise { get; set; } = 0.2f;
 
+    // プレイヤーの周りを動き回る: プレイヤーが止まってこの秒数たったら、周りの地点を渡り歩く
+    public float WanderDelay { get; set; } = 2f;
+    public float WanderIntervalMin { get; set; } = 3f;
+    public float WanderIntervalMax { get; set; } = 8f;
+    public float WanderRadiusMin { get; set; } = 0.8f;
+    public float WanderRadiusMax { get; set; } = 2.5f;
+    // これより遅ければプレイヤーは止まっているとみなす
+    public float StillSpeed { get; set; } = 0.3f;
+
     // 採餌・羽繕い
     public float ForageChance { get; set; } = 0.15f;
     public float PreenChance { get; set; } = 0.03f;

@@ -30,7 +30,7 @@ public sealed class ChirpScheduler
             && rng.Chance(MathF.Min(1f, p.SongChance * p.ChirpFrequency)))
             return Emit(ChirpKind.Song);
 
-        if (state is SparrowState.Idle or SparrowState.Hop or SparrowState.Forage)
+        if (state is SparrowState.Idle or SparrowState.Hop or SparrowState.Forage or SparrowState.Perched)
         {
             var chance = 1f - MathF.Exp(-p.ContactRatePerSecond * p.ChirpFrequency * dt);
             if (rng.Chance(chance))
