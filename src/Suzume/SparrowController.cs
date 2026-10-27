@@ -25,6 +25,8 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly PoseApplier applier = new();
     private readonly GroundTracker ground = new();
     private readonly RisingEdge beckon = new();
+    // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
+    private readonly ushort[] lastPlayerTimelines = new ushort[3];
     private Vector3? lastPlayerPosition;
     private int consecutiveErrors;
 
@@ -107,11 +109,16 @@ public sealed unsafe class SparrowController : IDisposable
         parameters.ChirpFrequency = config.ChirpFrequency;
 
         var head = playerPosition with { Y = playerPosition.Y + HeadHeight(player) };
+        LogPlayerTimelineChanges(owner);
         var beckoned = beckon.Update(IsBeckoning(owner));
+        if (beckoned)
+            Plugin.Log.Debug($"手まねきを検出 (状態 {LastPose.State}) Height={player->Height:F2} 頭={head:F2}");
 
         var pose = brain.Tick(new SparrowInput(
             dt, target, player->Rotation, playerPosition, playerVelocity, Plugin.Condition[ConditionFlag.Mounted],
             head, beckoned, jumping));
+        if (pose.State != LastPose.State)
+            Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
         applier.Apply(minion, pose);
         Active = true;
         LastPose = pose;
@@ -134,6 +141,21 @@ public sealed unsafe class SparrowController : IDisposable
         var sequencer = &owner->Timeline.TimelineSequencer;
         return sequencer->GetSlotTimeline(0) == BeckonTimelineId
             || sequencer->GetSlotTimeline(1) == BeckonTimelineId;
+    }
+
+    /// <summary>調査用: プレイヤーのアニメが変わったらログに出す(手まねきの検出確認)。</summary>
+    private void LogPlayerTimelineChanges(Character* owner)
+    {
+        var sequencer = &owner->Timeline.TimelineSequencer;
+        for (var slot = 0u; slot < lastPlayerTimelines.Length; slot++)
+        {
+            var id = sequencer->GetSlotTimeline(slot);
+            if (id == lastPlayerTimelines[slot])
+                continue;
+
+            lastPlayerTimelines[slot] = id;
+            Plugin.Log.Debug($"プレイヤー slot{slot} = {id}");
+        }
     }
 
     private void ReleaseIfActive()
