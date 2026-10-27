@@ -85,6 +85,9 @@ public sealed unsafe class SparrowController : IDisposable
             applier.ApplyLate(minion, LastPose);
     }
 
+    /// <summary>スズメをプレイヤーのそばの地面に置き直す(地面に埋まったときなどの逃げ道)。</summary>
+    public void ResetPosition() => brain.Invalidate();
+
     /// <summary>確認用: 次に地上で落ち着いたとき砂浴びを始めさせる。</summary>
     public void RequestDustBath() => brain.RequestDustBath();
 

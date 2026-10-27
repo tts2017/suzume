@@ -44,7 +44,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         controller = new SparrowController(config, chirpPlayer);
-        configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume));
+        configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume), controller.ResetPosition);
         windowSystem.AddWindow(configWindow);
         PluginInterface.UiBuilder.Draw += OnDraw;
         PluginInterface.UiBuilder.OpenConfigUi += configWindow.Toggle;
@@ -52,7 +52,7 @@ public sealed class Plugin : IDalamudPlugin
         Framework.Update += OnUpdate;
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume dust で砂浴び。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
+            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume reset で置き直し。/suzume dust で砂浴び。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
         });
     }
 
@@ -110,6 +110,10 @@ public sealed class Plugin : IDalamudPlugin
                 config.Enabled = parts[0] == "on";
                 config.Save();
                 ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
+                return;
+            case "reset":
+                controller.ResetPosition();
+                ChatGui.Print("[Suzume] スズメをそばの地面に置き直しました");
                 return;
             case "dust":
                 controller.RequestDustBath();

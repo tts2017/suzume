@@ -10,13 +10,15 @@ public sealed class ConfigWindow : Window
     private readonly Configuration config;
     private readonly Func<string> debugText;
     private readonly Action<ChirpKind> preview;
+    private readonly Action resetPosition;
 
-    public ConfigWindow(Configuration config, Func<string> debugText, Action<ChirpKind> preview)
+    public ConfigWindow(Configuration config, Func<string> debugText, Action<ChirpKind> preview, Action resetPosition)
         : base("タビスズメ###SuzumeConfig")
     {
         this.config = config;
         this.debugText = debugText;
         this.preview = preview;
+        this.resetPosition = resetPosition;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(320, 260),
@@ -72,6 +74,9 @@ public sealed class ConfigWindow : Window
 
         ImGui.TextDisabled("/beckon (手まねき) で頭に乗り、もう一度で下ります");
         ImGui.TextDisabled("スズメに向けて /angry /furious /slap /battlestance /box /stomp /throw をすると逃げます");
+
+        if (ImGui.Button("スズメをそばに置き直す"))
+            resetPosition();
 
         ImGui.Separator();
         ImGui.TextUnformatted("試聴");
