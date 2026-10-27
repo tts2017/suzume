@@ -42,7 +42,7 @@ public class SparrowWanderPerchTests
     [Fact]
     public void WandersAroundStillPlayerByHopping()
     {
-        var p = new SparrowParams { DustBathChance = 0f };
+        var p = new SparrowParams { DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = new SparrowBrain(p, new SeededRandom(1));
 
         var poses = Run(brain, _ => Input(), 40f);
@@ -58,7 +58,7 @@ public class SparrowWanderPerchTests
     [Fact]
     public void PerchesOnHeadWhenBeckoned()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = new SparrowBrain(p, new SeededRandom(1));
         brain.Tick(Input());
 
@@ -75,7 +75,7 @@ public class SparrowWanderPerchTests
     [Fact]
     public void StaysPerchedWhileWalking()
     {
-        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f });
+        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity });
         var walk = new Vector3(2f, 0f, 0f);
 
         var poses = Run(brain, i => Input(player: walk * (i * Dt), velocity: walk), 2f);
@@ -94,7 +94,7 @@ public class SparrowWanderPerchTests
     [InlineData("beckon")]
     public void LeavesHead(string reason)
     {
-        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f });
+        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity });
 
         var pose = brain.Tick(reason switch
         {
@@ -111,7 +111,7 @@ public class SparrowWanderPerchTests
     [Fact]
     public void ReturnsToGroundAfterLeavingHead()
     {
-        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f });
+        var brain = PerchedBrain(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity });
         brain.Tick(Input(perch: true));
 
         var poses = Run(brain, _ => Input(), 8f);

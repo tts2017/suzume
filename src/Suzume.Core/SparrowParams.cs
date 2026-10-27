@@ -47,9 +47,10 @@ public sealed class SparrowParams
     public float PreenDurationMin { get; set; } = 1.0f;
     public float PreenDurationMax { get; set; } = 2.0f;
 
-    // 砂浴び: プレイヤーがこの秒数止まっていたら、待機のたびにこの確率で始める
+    // 砂浴び: プレイヤーがこの秒数止まっていたら、そこから 20〜60 秒ごとに、落ち着いたところで始める
     public float DustBathDelay { get; set; } = 3f;
-    public float DustBathChance { get; set; } = 0.02f;
+    public float DustBathIntervalMin { get; set; } = 20f;
+    public float DustBathIntervalMax { get; set; } = 60f;
     public float DustBathDurationMin { get; set; } = 4f;
     public float DustBathDurationMax { get; set; } = 8f;
     // ばたつきと小休止の長さ

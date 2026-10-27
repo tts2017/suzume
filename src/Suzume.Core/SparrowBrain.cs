@@ -41,6 +41,8 @@ public sealed class SparrowBrain
     private Vector3 fleeDirection;
 
     // DustBath
+    private bool dustBathArmed;
+    private float dustBathCountdown;
     private bool dustFluttering;
     private float dustPhaseLeft;
     private bool shaking;
@@ -93,6 +95,7 @@ public sealed class SparrowBrain
         alarmCooldown = MathF.Max(0f, alarmCooldown - dt);
 
         UpdateWander(input, dt);
+        UpdateDustBathTimer(dt);
         goal = Goal(input);
         if (input.PerchRequested)
             OnBeckoned(input);
@@ -312,10 +315,11 @@ public sealed class SparrowBrain
         if (stateTime < stateDuration)
             return;
 
-        if (NeedsToMove(input))
-            EnterHop(input);
-        else if (playerStillTime >= p.DustBathDelay && rng.Chance(p.DustBathChance))
+        // 砂浴びの時間が来ていたら、渡り歩きの途中でもその場で始める
+        if (dustBathArmed && dustBathCountdown <= 0f)
             EnterDustBath();
+        else if (NeedsToMove(input))
+            EnterHop(input);
         else if (rng.Chance(p.ForageChance))
             EnterForage();
         else if (rng.Chance(p.PreenChance))
@@ -476,8 +480,29 @@ public sealed class SparrowBrain
 
     // ---- DustBath ----
 
+    /// <summary>プレイヤーが止まっている間、次の砂浴びまでの時間を数える。動き出したら数え直し。</summary>
+    private void UpdateDustBathTimer(float dt)
+    {
+        if (playerStillTime < p.DustBathDelay || float.IsPositiveInfinity(p.DustBathIntervalMin))
+        {
+            dustBathArmed = false;
+            return;
+        }
+
+        if (!dustBathArmed)
+        {
+            dustBathArmed = true;
+            dustBathCountdown = rng.Range(p.DustBathIntervalMin, p.DustBathIntervalMax);
+            return;
+        }
+
+        dustBathCountdown -= dt;
+    }
+
     private void EnterDustBath()
     {
+        // 終わったら次の間隔を数え直す
+        dustBathArmed = false;
         SetState(SparrowState.DustBath);
         stateDuration = rng.Range(p.DustBathDurationMin, p.DustBathDurationMax);
         shaking = false;

@@ -8,7 +8,7 @@ public class SparrowBrainTests
     private const float Dt = 1f / 60f;
 
     private static SparrowBrain NewBrain(SparrowParams? parameters = null, int seed = 1) =>
-        new(parameters ?? new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f }, new SeededRandom(seed));
+        new(parameters ?? new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity }, new SeededRandom(seed));
 
     // プレイヤーは既定で論理位置の 3y 後ろに静止している(警戒の範囲外)
     // 頭の位置は既定でプレイヤーの 1.7y 上
@@ -46,7 +46,7 @@ public class SparrowBrainTests
     [Fact]
     public void MovesToNearbyTargetByHoppingWithPauses()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = NewBrain(p);
         brain.Tick(Input(Vector3.Zero));
         var target = new Vector3(2f, 0f, 0f);
@@ -83,7 +83,7 @@ public class SparrowBrainTests
     [Fact]
     public void LooksAroundWithInstantTurnsWhileIdle()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f, ForageChance = 0f, PreenChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity, ForageChance = 0f, PreenChance = 0f };
         var brain = NewBrain(p);
 
         var poses = Run(brain, Input(Vector3.Zero), 5f);
@@ -98,7 +98,7 @@ public class SparrowBrainTests
     [Fact]
     public void ForagingPecksDownAndRecovers()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f, ForageChance = 1f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity, ForageChance = 1f };
         var brain = NewBrain(p);
 
         var poses = Run(brain, Input(Vector3.Zero), 4f);
@@ -125,7 +125,7 @@ public class SparrowBrainTests
     [Fact]
     public void HugeFrameDeltaDoesNotTeleport()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = NewBrain(p);
         brain.Tick(Input(Vector3.Zero));
         var target = new Vector3(3f, 0f, 0f);
@@ -152,7 +152,7 @@ public class SparrowBrainTests
     [Fact]
     public void FliesToDistantTargetThenLands()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = NewBrain(p);
         brain.Tick(Input(Vector3.Zero));
         var target = new Vector3(10f, 0f, 0f);
@@ -185,7 +185,7 @@ public class SparrowBrainTests
     [Fact]
     public void GlidesDownBeforeLanding()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var poses = FlyTenYalms(p);
 
         var landStart = poses.FindIndex(x => x.State == SparrowState.Land);
@@ -198,7 +198,7 @@ public class SparrowBrainTests
     [Fact]
     public void TouchesDownSoftly()
     {
-        var poses = FlyTenYalms(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f });
+        var poses = FlyTenYalms(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity });
 
         var landing = poses.Where(x => x.State == SparrowState.Land).ToList();
         var drops = landing.Zip(landing.Skip(1)).Select(pair => pair.First.Position.Y - pair.Second.Position.Y).ToList();
@@ -208,7 +208,7 @@ public class SparrowBrainTests
     [Fact]
     public void FlaresNoseUpWhileLanding()
     {
-        var poses = FlyTenYalms(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f });
+        var poses = FlyTenYalms(new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity });
 
         Assert.Contains(poses, x => x.State == SparrowState.Land && x.Pitch < -Angles.DegToRad(5f));
     }
@@ -216,7 +216,7 @@ public class SparrowBrainTests
     [Fact]
     public void LandsShortThenHopsToTarget()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var target = new Vector3(10f, 0f, 0f);
         var poses = FlyTenYalms(p);
 
@@ -228,7 +228,7 @@ public class SparrowBrainTests
     [Fact]
     public void SettlesSoftlyWhenRunningPlayerStops()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = NewBrain(p);
         brain.Tick(Input(Vector3.Zero));
         var velocity = new Vector3(6f, 0f, 0f);
@@ -279,7 +279,7 @@ public class SparrowBrainTests
     [Fact]
     public void KeepsUpWithFastMountWithoutResetting()
     {
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 0f };
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = NewBrain(p);
         brain.Tick(Input(Vector3.Zero));
         var velocity = new Vector3(20f, 0f, 0f);

@@ -9,12 +9,12 @@ public class SparrowDustBathTests
     private static readonly Vector3 Target = new(0.9f, 0f, -1.1f);
     private static readonly Vector3 Player = Vector3.Zero;
 
-    // 動き回りを止め、待機のたびに必ず砂浴びを始める設定
+    // 動き回りを止め、止まったらすぐ砂浴びを始める設定
     private static SparrowParams AlwaysBathe() => new()
     {
         WanderDelay = float.PositiveInfinity,
         DustBathDelay = 0f,
-        DustBathChance = 1f,
+        DustBathIntervalMin = 0f, DustBathIntervalMax = 0f,
     };
 
     private static SparrowInput Input(Vector3? velocity = null, bool perch = false, Vector3? player = null)
@@ -60,7 +60,6 @@ public class SparrowDustBathTests
     public void ShakesOffAndReturnsToIdle()
     {
         var p = AlwaysBathe();
-        p.DustBathChance = 1f;
         var brain = new SparrowBrain(p, new SeededRandom(1));
 
         var poses = Run(brain, Input(), 12f);
@@ -74,6 +73,23 @@ public class SparrowDustBathTests
         Assert.Equal(SparrowState.Idle, poses[bathEnd].State);
         Assert.Equal(0f, poses[bathEnd].Roll);
         Assert.Equal(0f, poses[bathEnd].Position.Y, 4);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void DustBathesWithinAMinuteOfStandingStillByDefault(int seed)
+    {
+        // 既定の設定 (動き回りあり) のまま、プレイヤーが止まっている
+        var p = new SparrowParams();
+        var brain = new SparrowBrain(p, new SeededRandom(seed));
+
+        var poses = Run(brain, Input(), p.DustBathDelay + p.DustBathIntervalMax + 10f);
+
+        Assert.Contains(poses, x => x.State == SparrowState.DustBath);
     }
 
     [Fact]
@@ -116,8 +132,8 @@ public class SparrowDustBathTests
     [Fact]
     public void StillNeverDustBathesWithDefaultChanceInShortIdle()
     {
-        // 既定の確率では、止まってすぐ (DustBathDelay 未満) には始めない
-        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathChance = 1f };
+        // 止まってすぐ (DustBathDelay 未満) には始めない
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = 0f, DustBathIntervalMax = 0f };
         var brain = new SparrowBrain(p, new SeededRandom(1));
 
         var poses = Run(brain, Input(), p.DustBathDelay - 0.5f);
