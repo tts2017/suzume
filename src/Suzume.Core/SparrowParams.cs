@@ -58,7 +58,17 @@ public sealed class SparrowParams
     public float LandPlayerSpeed { get; set; } = 3f;
     // 飛行中に地面の高さの基準を目標へ合わせる速さ (yalm/秒)
     public float GroundFollowSpeed { get; set; } = 3f;
-    public float LandDuration { get; set; } = 0.25f;
+    // 着地前の滑空: プレイヤーが止まり、この距離まで来たら羽ばたきをやめて下り坂で近づく
+    public float ApproachDistance { get; set; } = 4f;
+    // 滑空の下り坂 (目標までの水平距離 1y あたりの高さ)
+    public float GlideSlope { get; set; } = 0.35f;
+    public float GlideDescentSpeed { get; set; } = 1.5f;
+    // 滑空中の速さ = 目標までの距離 × この値 (最低 ApproachMinSpeed)
+    public float ApproachSpeedPerYalm { get; set; } = 2.5f;
+    public float ApproachMinSpeed { get; set; } = 1.5f;
+    // フレア: 最後に減速しながら頭を上げて降りる
+    public float LandDuration { get; set; } = 0.35f;
+    public float FlarePitchDeg { get; set; } = 15f;
     public float LandSettleDuration { get; set; } = 0.15f;
     public float LandPitchDeg { get; set; } = 15f;
     public float ResetDistance { get; set; } = 30f;

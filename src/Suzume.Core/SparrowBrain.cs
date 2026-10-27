@@ -46,6 +46,7 @@ public sealed class SparrowBrain
     private float groundY;
     private float altitude;
     private float landStartAltitude;
+    private float landStartSpeed;
 
     private float alarmCooldown;
 
@@ -383,39 +384,60 @@ public sealed class SparrowBrain
 
     private void TickFly(in SparrowInput input, float dt)
     {
-        // 波状飛行: 羽ばたいて上昇 → 翼を畳んで滑空・下降 を繰り返す
-        flightPhaseLeft -= dt;
-        if (flightPhaseLeft <= 0f)
+        var gap = Angles.HorizontalDistance(position, input.Target);
+        var playerSlow = Angles.Horizontal(input.PlayerVelocity).Length() < p.LandPlayerSpeed;
+
+        float speed;
+        if (playerSlow && gap < p.ApproachDistance)
         {
-            flapping = !flapping;
-            flightPhaseLeft = flapping ? p.FlapDuration : p.GlideDuration;
+            // 着地前の滑空: 羽ばたきの上下をやめ、目標までの距離に比例した高さへ下りながら減速する
+            var glideAltitude = MathF.Min(altitude, p.GlideSlope * gap);
+            altitude = MathF.Max(glideAltitude, altitude - p.GlideDescentSpeed * dt);
+            speed = Math.Clamp(gap * p.ApproachSpeedPerYalm, p.ApproachMinSpeed, p.FlySpeed);
+        }
+        else
+        {
+            // 波状飛行: 羽ばたいて上昇 → 翼を畳んで滑空・下降 を繰り返す
+            flightPhaseLeft -= dt;
+            if (flightPhaseLeft <= 0f)
+            {
+                flapping = !flapping;
+                flightPhaseLeft = flapping ? p.FlapDuration : p.GlideDuration;
+            }
+
+            altitude += (flapping ? p.FlapClimbSpeed : -p.GlideSinkSpeed) * dt;
+            altitude = Math.Clamp(altitude, p.FlyAltitudeMin, p.FlyAltitudeMax);
+
+            // 騎乗中などで論理位置が速く動くときは、それより速く飛ぶ
+            speed = MathF.Max(p.FlySpeed, Angles.Horizontal(input.PlayerVelocity).Length() * 1.3f);
         }
 
-        altitude += (flapping ? p.FlapClimbSpeed : -p.GlideSinkSpeed) * dt;
-        altitude = Math.Clamp(altitude, p.FlyAltitudeMin, p.FlyAltitudeMax);
-
-        // 騎乗中などで論理位置が速く動くときは、それより速く飛ぶ
-        var speed = MathF.Max(p.FlySpeed, Angles.Horizontal(input.PlayerVelocity).Length() * 1.3f);
         MoveTowards(input.Target, speed * dt, dt);
         position.Y = groundY + altitude;
 
-        // プレイヤーが速く動いている間は降りずに付いていく。地面の高さが目標に追いつくまでは降りない
-        var playerSlow = Angles.Horizontal(input.PlayerVelocity).Length() < p.LandPlayerSpeed;
+        // プレイヤーが速く動いている間は降りずに付いていく。地面の高さが目標に追いつくまでと、
+        // 滑空の高さまで下りきるまでは降りない(真上から急降下しない)
         if (playerSlow
             && Angles.HorizontalDistance(position, input.Target) < p.LandDistance
-            && MathF.Abs(input.Target.Y - groundY) < Epsilon)
+            && MathF.Abs(input.Target.Y - groundY) < Epsilon
+            && altitude <= p.GlideSlope * p.LandDistance + Epsilon)
         {
             SetState(SparrowState.Land);
             landStartAltitude = altitude;
+            landStartSpeed = speed;
         }
     }
 
     private void TickLand(in SparrowInput input, float dt)
     {
+        // フレア: 前進も降下もなめらかに 0 へ近づけ、頭を少し上げてブレーキをかける。
+        // 目標の手前で接地し、残りはホップで詰める
         var u = MathF.Min(1f, stateTime / p.LandDuration);
-        altitude = landStartAltitude * (1f - u);
-        MoveTowards(input.Target, p.FlySpeed * 0.5f * dt, dt);
+        var settled = u * u * (3f - 2f * u);
+        altitude = landStartAltitude * (1f - settled);
+        MoveTowards(input.Target, landStartSpeed * (1f - u) * dt, dt);
         position.Y = groundY + altitude;
+        pitch = -Angles.DegToRad(p.FlarePitchDeg) * MathF.Sin(MathF.PI * u);
 
         if (u >= 1f)
             EnterIdle(afterLanding: true);

@@ -169,6 +169,83 @@ public class SparrowBrainTests
         Assert.True(Vector3.Distance(final.Position, target) <= p.ArriveDistance + p.HopDistanceMax);
     }
 
+    private static List<SparrowPose> FlyTenYalms(SparrowParams p)
+    {
+        var brain = NewBrain(p);
+        brain.Tick(Input(Vector3.Zero));
+        return Run(brain, Input(new Vector3(10f, 0f, 0f)), 8f);
+    }
+
+    [Fact]
+    public void GlidesDownBeforeLanding()
+    {
+        var p = new SparrowParams();
+        var poses = FlyTenYalms(p);
+
+        var landStart = poses.FindIndex(x => x.State == SparrowState.Land);
+        Assert.True(landStart > 0);
+        // 着地に入る時点で、すでに低く滑空している(波状飛行の高さから一気に落ちない)
+        Assert.True(poses[landStart].Position.Y <= p.GlideSlope * p.LandDistance + 0.05f,
+            $"着地開始の高さ {poses[landStart].Position.Y}");
+    }
+
+    [Fact]
+    public void TouchesDownSoftly()
+    {
+        var poses = FlyTenYalms(new SparrowParams());
+
+        var landing = poses.Where(x => x.State == SparrowState.Land).ToList();
+        var drops = landing.Zip(landing.Skip(1)).Select(pair => pair.First.Position.Y - pair.Second.Position.Y).ToList();
+        Assert.All(drops, drop => Assert.True(drop < 0.03f, $"1 フレームの降下 {drop}"));
+    }
+
+    [Fact]
+    public void FlaresNoseUpWhileLanding()
+    {
+        var poses = FlyTenYalms(new SparrowParams());
+
+        Assert.Contains(poses, x => x.State == SparrowState.Land && x.Pitch < -Angles.DegToRad(5f));
+    }
+
+    [Fact]
+    public void LandsShortThenHopsToTarget()
+    {
+        var p = new SparrowParams();
+        var target = new Vector3(10f, 0f, 0f);
+        var poses = FlyTenYalms(p);
+
+        var landEnd = poses.FindLastIndex(x => x.State == SparrowState.Land);
+        Assert.True(Vector3.Distance(poses[landEnd + 1].Position, target) > 0.1f, "目標の手前に降りる");
+        Assert.True(Vector3.Distance(poses[^1].Position, target) <= p.ArriveDistance + p.HopDistanceMax);
+    }
+
+    [Fact]
+    public void SettlesSoftlyWhenRunningPlayerStops()
+    {
+        var p = new SparrowParams();
+        var brain = NewBrain(p);
+        brain.Tick(Input(Vector3.Zero));
+        var velocity = new Vector3(6f, 0f, 0f);
+        var target = Vector3.Zero;
+        for (var i = 1; i <= 180; i++)
+        {
+            target = velocity * (i * Dt);
+            brain.Tick(Input(target, target + new Vector3(1.5f, 0f, 0f), velocity));
+        }
+
+        // 真横を飛んでいる状態でプレイヤーが止まる
+        var poses = Run(brain, Input(target, target + new Vector3(1.5f, 0f, 0f), Vector3.Zero), 5f);
+
+        var landing = poses.Where(x => x.State == SparrowState.Land).ToList();
+        Assert.NotEmpty(landing);
+        Assert.True(landing[0].Position.Y <= p.GlideSlope * p.LandDistance + 0.05f, $"着地開始の高さ {landing[0].Position.Y}");
+        // 飛行と着地の間の降下だけを見る(着地後のホップは放物線なので終わりが速い)
+        var airborne = poses.Where(x => x.State is SparrowState.Fly or SparrowState.Land).ToList();
+        Assert.All(airborne.Zip(airborne.Skip(1)), pair =>
+            Assert.True(pair.First.Position.Y - pair.Second.Position.Y < 0.03f, $"1 フレームの降下 {pair.First.Position.Y - pair.Second.Position.Y}"));
+        Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
+    }
+
     [Fact]
     public void SnapsToTargetAfterTeleport()
     {
