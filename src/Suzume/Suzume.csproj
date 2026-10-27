@@ -14,4 +14,9 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\assets\sounds\*.wav" LogicalName="Suzume.Sounds.%(Filename)%(Extension)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dalamud はプラグインの DLL の隣にある images/icon.png をアイコンとして表示する -->
+    <None Include="..\..\assets\icon.png" Link="images\icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
