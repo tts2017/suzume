@@ -49,6 +49,27 @@ public class ChirpSchedulerTests
     }
 
     [Fact]
+    public void DustFlutterPlaysRustleWithoutTouchingCooldown()
+    {
+        var scheduler = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));
+        Assert.Equal(ChirpKind.Contact, scheduler.Update(Dt, SparrowState.Idle, SparrowTrigger.None));
+        // 鳴き声の間隔中でも羽音は鳴る
+        Assert.Equal(ChirpKind.Dust, scheduler.Update(Dt, SparrowState.DustBath, SparrowTrigger.DustFlutter));
+
+        var fresh = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));
+        Assert.Equal(ChirpKind.Dust, fresh.Update(Dt, SparrowState.DustBath, SparrowTrigger.DustFlutter));
+        // 羽音は鳴き声の間隔を使わない
+        Assert.Equal(ChirpKind.Contact, fresh.Update(Dt, SparrowState.Idle, SparrowTrigger.None));
+    }
+
+    [Fact]
+    public void SilentWhileDustBathing()
+    {
+        var scheduler = new ChirpScheduler(new SparrowParams { ContactRatePerSecond = 1000f }, new SequenceRandom(0f));
+        Assert.Null(scheduler.Update(Dt, SparrowState.DustBath, SparrowTrigger.None));
+    }
+
+    [Fact]
     public void ChirpsWhilePerchedOnHead()
     {
         var scheduler = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));

@@ -12,6 +12,8 @@ import numpy as np
 RATE = 44100
 VARIANTS = 3
 PEAK = 0.8
+# 種類ごとの振幅のピーク。羽音は鳴き声より控えめにする
+PEAK_BY_KIND = {"dust": 0.45}
 
 
 def envelope(n, attack, release):
@@ -83,9 +85,23 @@ def flight(rng):
     return out * envelope(len(out), 0.05, 0.3)
 
 
-def normalize(signal):
+def dust(rng):
+    """「バサバサ」砂浴びの羽音: 約 20Hz の羽ばたきで低めの風切り音を断続させ、砂のこすれを混ぜる"""
+    n = int(RATE * rng.uniform(0.5, 0.9))
+    t = np.arange(n) / RATE
+    wing = bandpass(rng.standard_normal(n), 250, 2500)
+    wing /= np.max(np.abs(wing)) + 1e-9
+    beats = (0.5 + 0.5 * np.sin(2 * np.pi * rng.uniform(16, 22) * t)) ** 2
+    sand = bandpass(rng.standard_normal(n), 3000, 8000)
+    sand /= np.max(np.abs(sand)) + 1e-9
+    # 砂粒: まばらな粒に短い減衰を付ける
+    grains = np.convolve((rng.random(n) < 0.01).astype(float), np.exp(-np.arange(200) / 40.0), mode="same")
+    return (0.8 * wing * beats + 0.35 * sand * np.clip(grains, 0.0, 1.0)) * envelope(n, 0.08, 0.3)
+
+
+def normalize(signal, peak=PEAK):
     signal = signal - np.mean(signal)
-    return signal * (PEAK / (np.max(np.abs(signal)) + 1e-9))
+    return signal * (peak / (np.max(np.abs(signal)) + 1e-9))
 
 
 def write_wav(path, signal):
@@ -97,7 +113,7 @@ def write_wav(path, signal):
         w.writeframes(data.tobytes())
 
 
-KINDS = {"contact": contact, "song": song, "alarm": alarm, "flight": flight}
+KINDS = {"contact": contact, "song": song, "alarm": alarm, "flight": flight, "dust": dust}
 
 
 def main(out_dir):
@@ -108,7 +124,7 @@ def main(out_dir):
             # 種類と番号から決まるシードで、何度実行しても同じ音になる
             rng = np.random.default_rng(1000 * kind_index + variant)
             path = out / f"{name}_{variant}.wav"
-            write_wav(path, normalize(make(rng)))
+            write_wav(path, normalize(make(rng), PEAK_BY_KIND.get(name, PEAK)))
             print(path)
 
 

@@ -25,6 +25,8 @@ public sealed unsafe class PoseApplier
     private static readonly ushort IdleTimelineId = 212;
     // 羽ばたいて飛ぶ姿勢
     private static readonly ushort FlyTimelineId = 22;
+    // その場で羽ばたく姿勢 (normal/idle → cbnm_id0)。砂浴びのばたつきに使う
+    private static readonly ushort FlutterTimelineId = 3;
     // DrawOffset はモデルの向きに合わせて回る
     private static readonly bool DrawOffsetIsLocal = true;
     private static readonly PitchMode PitchWrite = PitchMode.Update;
@@ -52,7 +54,12 @@ public sealed unsafe class PoseApplier
         offset += BaseDrawOffset;
         go->SetDrawOffset(offset.X, offset.Y, offset.Z);
 
-        var timelineId = pose.Anim == SparrowAnim.Fly ? FlyTimelineId : IdleTimelineId;
+        var timelineId = pose.Anim switch
+        {
+            SparrowAnim.Fly => FlyTimelineId,
+            SparrowAnim.Flutter => FlutterTimelineId,
+            _ => IdleTimelineId,
+        };
         var timeline = &((Character*)minion)->Timeline;
         timeline->BaseOverride = timelineId;
         // AI を止めているとゲームがベースアニメを選び直さないので、切り替わったときに 1 回だけ直接再生する
@@ -95,6 +102,6 @@ public sealed unsafe class PoseApplier
     {
         var draw = go->DrawObject;
         if (draw != null)
-            draw->Object.Rotation = Quaternion.CreateFromYawPitchRoll(pose.Yaw, PitchSign * pose.Pitch, 0f);
+            draw->Object.Rotation = Quaternion.CreateFromYawPitchRoll(pose.Yaw, PitchSign * pose.Pitch, pose.Roll);
     }
 }

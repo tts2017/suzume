@@ -22,6 +22,9 @@ public sealed class ChirpScheduler
             return Emit(ChirpKind.Alarm);
         if (triggers.HasFlag(SparrowTrigger.TakeOff))
             return Emit(ChirpKind.Flight);
+        // 砂浴びの羽音は鳴き声ではないので、間隔に関係なく鳴らし、間隔も使わない
+        if (triggers.HasFlag(SparrowTrigger.DustFlutter))
+            return ChirpKind.Dust;
 
         if (cooldown > 0f || p.ChirpFrequency <= 0f)
             return null;

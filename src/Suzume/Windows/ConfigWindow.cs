@@ -104,6 +104,7 @@ public sealed class ConfigWindow : Window
         ChirpKind.Song => "チュンチュン",
         ChirpKind.Alarm => "ジュクジュク",
         ChirpKind.Flight => "チュリリ",
+        ChirpKind.Dust => "バサバサ",
         _ => kind.ToString(),
     };
 }

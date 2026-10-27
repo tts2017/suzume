@@ -20,6 +20,9 @@ public sealed class SparrowBrain
     private Vector3 position;
     private float yaw;
     private float pitch;
+    private float roll;
+    // 見た目だけ沈める深さ(砂浴びの腹ばい)。position そのものは地面のまま
+    private float crouch;
     private SparrowState state;
     private SparrowAnim anim;
     private SparrowTrigger triggers;
@@ -36,6 +39,12 @@ public sealed class SparrowBrain
     private float hopTime;
     private float hopGapLeft;
     private Vector3 fleeDirection;
+
+    // DustBath
+    private bool dustFluttering;
+    private float dustPhaseLeft;
+    private bool shaking;
+    private float shakeTime;
 
     // Forage / Preen
     private int pecks;
@@ -115,13 +124,17 @@ public sealed class SparrowBrain
             case SparrowState.Perched:
                 TickPerched(input, dt);
                 break;
+            case SparrowState.DustBath:
+                TickDustBath(input, dt);
+                break;
         }
 
         yaw = Angles.Wrap(yaw);
         return CurrentPose();
     }
 
-    private SparrowPose CurrentPose() => new(position, yaw, pitch, anim, state, triggers);
+    private SparrowPose CurrentPose() =>
+        new(position - new Vector3(0f, crouch, 0f), yaw, pitch, anim, state, triggers, roll);
 
     private void Reset(in SparrowInput input)
     {
@@ -142,6 +155,8 @@ public sealed class SparrowBrain
     {
         state = next;
         stateTime = 0f;
+        roll = 0f;
+        crouch = 0f;
     }
 
     // ---- 動き回る・頭に乗る ----
@@ -191,7 +206,8 @@ public sealed class SparrowBrain
         perchIntent = true;
         goal = Goal(input);
         // 飛んでいる途中なら行き先が頭に変わるだけ
-        if (state is SparrowState.Idle or SparrowState.Hop or SparrowState.Forage or SparrowState.Preen or SparrowState.Alarm)
+        if (state is SparrowState.Idle or SparrowState.Hop or SparrowState.Forage or SparrowState.Preen
+            or SparrowState.Alarm or SparrowState.DustBath)
             EnterTakeOff(input);
     }
 
@@ -298,6 +314,8 @@ public sealed class SparrowBrain
 
         if (NeedsToMove(input))
             EnterHop(input);
+        else if (playerStillTime >= p.DustBathDelay && rng.Chance(p.DustBathChance))
+            EnterDustBath();
         else if (rng.Chance(p.ForageChance))
             EnterForage();
         else if (rng.Chance(p.PreenChance))
@@ -454,6 +472,71 @@ public sealed class SparrowBrain
         // 羽繕いの代用: 小刻みに体を揺らす(v2 でボーン操作に置き換える)
         pitch = Angles.DegToRad(10f) * MathF.Sin(stateTime * MathF.Tau * 3f);
         yaw = preenBaseYaw + 0.2f * MathF.Sin(stateTime * MathF.Tau * 1.5f);
+    }
+
+    // ---- DustBath ----
+
+    private void EnterDustBath()
+    {
+        SetState(SparrowState.DustBath);
+        stateDuration = rng.Range(p.DustBathDurationMin, p.DustBathDurationMax);
+        shaking = false;
+        StartDustPhase(fluttering: true);
+    }
+
+    private void StartDustPhase(bool fluttering)
+    {
+        dustFluttering = fluttering;
+        dustPhaseLeft = fluttering
+            ? rng.Range(p.DustFlutterMin, p.DustFlutterMax)
+            : rng.Range(p.DustPauseMin, p.DustPauseMax);
+        if (fluttering)
+            triggers |= SparrowTrigger.DustFlutter;
+    }
+
+    private void TickDustBath(in SparrowInput input, float dt)
+    {
+        if (TryInterrupt(input))
+            return;
+
+        if (shaking)
+        {
+            // 最後に立ち上がって体をブルッと振るう
+            shakeTime += dt;
+            roll = Angles.DegToRad(p.ShakeRollDeg) * MathF.Sin(MathF.Tau * p.ShakeHz * shakeTime);
+            if (shakeTime >= p.ShakeDuration)
+                EnterIdle();
+            return;
+        }
+
+        if (stateTime >= stateDuration)
+        {
+            shaking = true;
+            shakeTime = 0f;
+            anim = SparrowAnim.Idle;
+            crouch = 0f;
+            pitch = 0f;
+            return;
+        }
+
+        dustPhaseLeft -= dt;
+        if (dustPhaseLeft <= 0f)
+            StartDustPhase(!dustFluttering);
+
+        // 腹ばいになり、ばたつきの間は羽をばたつかせて体を左右に揺する
+        crouch = p.DustCrouch;
+        if (dustFluttering)
+        {
+            anim = SparrowAnim.Flutter;
+            pitch = Angles.DegToRad(p.DustPitchDeg);
+            roll = Angles.DegToRad(p.DustRollDeg) * MathF.Sin(MathF.Tau * p.DustRollHz * stateTime);
+        }
+        else
+        {
+            anim = SparrowAnim.Idle;
+            pitch = Angles.DegToRad(p.DustPitchDeg) * 0.5f;
+            roll = 0f;
+        }
     }
 
     // ---- TakeOff / Fly / Land ----

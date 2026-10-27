@@ -14,6 +14,8 @@ public enum SparrowState
     Alarm,
     /// <summary>プレイヤーの頭の上に止まっている</summary>
     Perched,
+    /// <summary>砂浴び</summary>
+    DustBath,
 }
 
 /// <summary>ゲーム側で再生させるベースアニメーション。</summary>
@@ -21,6 +23,8 @@ public enum SparrowAnim
 {
     Idle,
     Fly,
+    /// <summary>その場で羽をばたつかせる(砂浴び)</summary>
+    Flutter,
 }
 
 public enum ChirpKind
@@ -33,6 +37,8 @@ public enum ChirpKind
     Alarm,
     /// <summary>「チュリリ」飛び立ち</summary>
     Flight,
+    /// <summary>「バサバサ」砂浴びの羽音(鳴き声ではない)</summary>
+    Dust,
 }
 
 /// <summary>その Tick で起きた出来事。鳴き声のきっかけに使う。</summary>
@@ -43,6 +49,8 @@ public enum SparrowTrigger
     TakeOff = 1,
     Alarm = 2,
     LongIdleStart = 4,
+    /// <summary>砂浴びでばたつき始めた</summary>
+    DustFlutter = 8,
 }
 
 /// <param name="Target">スズメが付いていく地上の目標地点(地面の高さ込み)</param>
@@ -62,10 +70,12 @@ public readonly record struct SparrowInput(
 
 /// <param name="Position">見た目の位置</param>
 /// <param name="Pitch">前傾角(ラジアン、正で頭が下がる)</param>
+/// <param name="Roll">左右の傾き(ラジアン)</param>
 public readonly record struct SparrowPose(
     Vector3 Position,
     float Yaw,
     float Pitch,
     SparrowAnim Anim,
     SparrowState State,
-    SparrowTrigger Triggers);
+    SparrowTrigger Triggers,
+    float Roll = 0f);

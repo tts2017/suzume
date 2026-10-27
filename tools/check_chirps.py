@@ -20,7 +20,12 @@ LIMITS = {
     "song": (0.15, 0.9, 2500, 5500),
     "alarm": (0.35, 0.65, 2500, 7500),
     "flight": (0.2, 0.4, 2500, 6000),
+    # 砂浴びの羽音: 低めの「バサバサ」と砂のこすれ
+    "dust": (0.45, 1.0, 200, 6000),
 }
+
+# 振幅のピークの範囲。羽音は鳴き声より控えめにする
+AMPLITUDE = {"dust": (0.3, 0.5)}
 
 
 def check(path, problems):
@@ -42,8 +47,9 @@ def check(path, problems):
         problems.append(f"{path.name}: 長さ {duration:.3f}s が {min_sec}〜{max_sec}s の範囲外")
     if not min_hz <= peak_hz <= max_hz:
         problems.append(f"{path.name}: ピーク {peak_hz:.0f}Hz が {min_hz}〜{max_hz}Hz の範囲外")
-    if not 0.5 <= peak_amp <= 0.9:
-        problems.append(f"{path.name}: 振幅 {peak_amp:.2f} が 0.5〜0.9 の範囲外")
+    min_amp, max_amp = AMPLITUDE.get(kind, (0.5, 0.9))
+    if not min_amp <= peak_amp <= max_amp:
+        problems.append(f"{path.name}: 振幅 {peak_amp:.2f} が {min_amp}〜{max_amp} の範囲外")
     return samples
 
 

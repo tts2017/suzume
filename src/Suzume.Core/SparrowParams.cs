@@ -47,6 +47,26 @@ public sealed class SparrowParams
     public float PreenDurationMin { get; set; } = 1.0f;
     public float PreenDurationMax { get; set; } = 2.0f;
 
+    // 砂浴び: プレイヤーがこの秒数止まっていたら、待機のたびにこの確率で始める
+    public float DustBathDelay { get; set; } = 3f;
+    public float DustBathChance { get; set; } = 0.02f;
+    public float DustBathDurationMin { get; set; } = 4f;
+    public float DustBathDurationMax { get; set; } = 8f;
+    // ばたつきと小休止の長さ
+    public float DustFlutterMin { get; set; } = 0.5f;
+    public float DustFlutterMax { get; set; } = 1.0f;
+    public float DustPauseMin { get; set; } = 0.3f;
+    public float DustPauseMax { get; set; } = 0.8f;
+    // 腹ばいで沈む深さ (yalm)、前傾、左右の揺れ
+    public float DustCrouch { get; set; } = 0.03f;
+    public float DustPitchDeg { get; set; } = 20f;
+    public float DustRollDeg { get; set; } = 15f;
+    public float DustRollHz { get; set; } = 6f;
+    // 終わりに体を振るう
+    public float ShakeDuration { get; set; } = 0.3f;
+    public float ShakeRollDeg { get; set; } = 20f;
+    public float ShakeHz { get; set; } = 10f;
+
     // 飛行
     public float FlyDistance { get; set; } = 6f;
     public float FastFlyDistance { get; set; } = 1.5f;
