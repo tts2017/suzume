@@ -4,6 +4,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.Havok.Animation.Rig;
+using Suzume.Core;
 
 namespace Suzume;
 
@@ -13,13 +14,12 @@ namespace Suzume;
 /// </summary>
 public sealed unsafe class BonePoser : IDisposable
 {
-    // 左右の翼。同じ角度を左右対称に足す
-    private static readonly (string Name, float Side)[] Wings = [("j_ude_a_l", 1f), ("j_ude_a_r", -1f)];
-    // 翼を開く向き。体の内側へ閉じてしまうなら -1 にする
-    private static readonly float WingOpenSign = 1f;
+    // 左右の翼の付け根と、その先のボーン
+    private static readonly (string Root, string Tip)[] Wings = [("j_ude_a_l", "j_ude_b_l"), ("j_ude_a_r", "j_ude_b_r")];
 
     private readonly Hook<Skeleton.Delegates.UpdateAnimations>? updateHook;
-    private readonly int[] wingIndex = [-1, -1];
+    private readonly int[] rootIndex = [-1, -1];
+    private readonly int[] tipIndex = [-1, -1];
     private hkaSkeleton* indexedSkeleton;
 
     public BonePoser()
@@ -35,27 +35,31 @@ public sealed unsafe class BonePoser : IDisposable
         updateHook.Enable();
     }
 
-    /// <summary>翼のボーンに足す回転 (ラジアン)。0 ならアニメのまま。毎フレーム制御側が入れる。</summary>
-    public float WingAngle { get; set; }
+    /// <summary>翼を体の外側へ開く角度 (ラジアン)。0 ならアニメのまま。毎フレーム制御側が入れる。</summary>
+    public float WingSpread { get; set; }
+
+    /// <summary>開いた翼を上下に振る角度 (ラジアン、正で上)。</summary>
+    public float WingFlap { get; set; }
 
     private void UpdateAnimationsDetour(Skeleton* first, float deltaTime)
     {
         updateHook!.Original(first, deltaTime);
-        if (WingAngle == 0f)
+        if (WingSpread == 0f && WingFlap == 0f)
             return;
 
         try
         {
-            ApplyWings(WingAngle);
+            ApplyWings(WingSpread, WingFlap);
         }
         catch (Exception ex)
         {
-            WingAngle = 0f;
+            WingSpread = 0f;
+            WingFlap = 0f;
             Plugin.Log.Error(ex, "翼のボーンの書き込みに失敗しました");
         }
     }
 
-    private void ApplyWings(float angle)
+    private void ApplyWings(float spread, float flap)
     {
         var minion = MinionTracker.FindSparrow(out _);
         if (minion == null)
@@ -74,23 +78,43 @@ public sealed unsafe class BonePoser : IDisposable
             return;
 
         IndexWings(pose->Skeleton);
+
+        // 先に両翼の新しい局所回転をアニメ計算後のモデル空間の形から求め、まとめて書き込む
+        var model = pose->AccessSyncedPoseModelSpace();
+        var rotations = new Quaternion?[Wings.Length];
         for (var i = 0; i < Wings.Length; i++)
         {
-            if (wingIndex[i] < 0)
+            var root = rootIndex[i];
+            var tip = tipIndex[i];
+            if (root < 0 || tip < 0)
                 continue;
 
-            var local = pose->AccessBoneLocalSpace(wingIndex[i]);
-            var current = new Quaternion(local->Rotation.X, local->Rotation.Y, local->Rotation.Z, local->Rotation.W);
-            var rotated = current * Quaternion.CreateFromAxisAngle(Vector3.UnitZ, WingOpenSign * Wings[i].Side * angle);
-            local->Rotation.X = rotated.X;
-            local->Rotation.Y = rotated.Y;
-            local->Rotation.Z = rotated.Z;
-            local->Rotation.W = rotated.W;
+            var parent = pose->Skeleton->ParentIndices[root];
+            var parentRotation = parent >= 0 ? ToQuaternion(model->Data[parent].Rotation) : Quaternion.Identity;
+            var shoulder = ToVector(model->Data[root].Translation);
+            var toTip = Vector3.Subtract(ToVector(model->Data[tip].Translation), shoulder);
+            rotations[i] = WingPose.LocalRotation(parentRotation, ToQuaternion(model->Data[root].Rotation), shoulder, toTip, spread, flap);
         }
 
-        // 書き換えた局所の回転から、子のボーン (翼の先) を含めてモデル空間を計算し直す
+        for (var i = 0; i < Wings.Length; i++)
+        {
+            if (rotations[i] is not { } rotation)
+                continue;
+
+            var local = pose->AccessBoneLocalSpace(rootIndex[i]);
+            local->Rotation.X = rotation.X;
+            local->Rotation.Y = rotation.Y;
+            local->Rotation.Z = rotation.Z;
+            local->Rotation.W = rotation.W;
+        }
+
+        // 書き換えた局所の回転から、翼の先を含めてモデル空間を計算し直す
         pose->AccessSyncedPoseModelSpace();
     }
+
+    private static Quaternion ToQuaternion(FFXIVClientStructs.Havok.Common.Base.Math.Quaternion.hkQuaternionf q) => new(q.X, q.Y, q.Z, q.W);
+
+    private static Vector3 ToVector(FFXIVClientStructs.Havok.Common.Base.Math.Vector.hkVector4f v) => new(v.X, v.Y, v.Z);
 
     private void IndexWings(hkaSkeleton* skeleton)
     {
@@ -98,19 +122,25 @@ public sealed unsafe class BonePoser : IDisposable
             return;
 
         for (var i = 0; i < Wings.Length; i++)
-            wingIndex[i] = -1;
+        {
+            rootIndex[i] = -1;
+            tipIndex[i] = -1;
+        }
+
         for (var bone = 0; bone < skeleton->Bones.Length; bone++)
         {
             var name = skeleton->Bones[bone].Name.String;
             for (var i = 0; i < Wings.Length; i++)
             {
-                if (name == Wings[i].Name)
-                    wingIndex[i] = bone;
+                if (name == Wings[i].Root)
+                    rootIndex[i] = bone;
+                else if (name == Wings[i].Tip)
+                    tipIndex[i] = bone;
             }
         }
 
         indexedSkeleton = skeleton;
-        Plugin.Log.Debug($"翼のボーン: 左 {wingIndex[0]} 右 {wingIndex[1]}");
+        Plugin.Log.Debug($"翼のボーン: 左 {rootIndex[0]}→{tipIndex[0]} 右 {rootIndex[1]}→{tipIndex[1]}");
     }
 
     public void Dispose() => updateHook?.Dispose();

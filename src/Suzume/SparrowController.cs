@@ -150,7 +150,8 @@ public sealed unsafe class SparrowController : IDisposable
         if (pose.State != LastPose.State)
             Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
         applier.Apply(minion, pose);
-        bonePoser.WingAngle = pose.WingAngle;
+        bonePoser.WingSpread = pose.WingSpread;
+        bonePoser.WingFlap = pose.WingFlap;
         LogHeights((GameObject*)minion, pose, playerPosition);
         Active = true;
         LastPose = pose;
@@ -227,7 +228,8 @@ public sealed unsafe class SparrowController : IDisposable
             return;
 
         Active = false;
-        bonePoser.WingAngle = 0f;
+        bonePoser.WingSpread = 0f;
+        bonePoser.WingFlap = 0f;
         var minion = MinionTracker.FindSparrow(out _);
         if (minion != null)
             applier.Release(minion);

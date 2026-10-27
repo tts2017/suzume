@@ -68,8 +68,8 @@ public sealed class SparrowParams
     public float DustRockHz { get; set; } = 3f;
     public float DustShimmyYawDeg { get; set; } = 10f;
     public float DustShimmyHz { get; set; } = 2f;
-    // 翼: 少し開いて高速でばたつかせる
-    public float DustWingSpreadDeg { get; set; } = 30f;
+    // 翼: 体の外側へ大きく開いて、高速で上下にばたつかせる
+    public float DustWingSpreadDeg { get; set; } = 60f;
     public float DustWingBeatDeg { get; set; } = 25f;
     public float DustWingBeatHz { get; set; } = 12f;
     // 終わりに体を振るう

@@ -73,7 +73,8 @@ public readonly record struct SparrowInput(
 /// <param name="Position">見た目の位置</param>
 /// <param name="Pitch">前傾角(ラジアン、正で頭が下がる)</param>
 /// <param name="Roll">左右の傾き(ラジアン)</param>
-/// <param name="WingAngle">翼のボーンに足す回転(ラジアン、左右対称)。0 ならアニメのまま</param>
+/// <param name="WingSpread">翼を体の外側へ開く角度(ラジアン)。0 ならアニメのまま</param>
+/// <param name="WingFlap">開いた翼を上下に振る角度(ラジアン、正で上)</param>
 public readonly record struct SparrowPose(
     Vector3 Position,
     float Yaw,
@@ -82,4 +83,5 @@ public readonly record struct SparrowPose(
     SparrowState State,
     SparrowTrigger Triggers,
     float Roll = 0f,
-    float WingAngle = 0f);
+    float WingSpread = 0f,
+    float WingFlap = 0f);

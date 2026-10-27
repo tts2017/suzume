@@ -51,10 +51,11 @@ public class SparrowDustBathTests
         Assert.NotEmpty(bath);
         // 地面に腹を付けたまま (止まり姿勢のアニメ)、翼だけを高速でばたつかせる
         Assert.All(bath, x => Assert.Equal(SparrowAnim.Idle, x.Anim));
-        var fluttering = bath.Where(x => x.WingAngle != 0f).ToList();
+        var fluttering = bath.Where(x => x.WingSpread > 0f).ToList();
         Assert.NotEmpty(fluttering);
-        Assert.Contains(bath, x => x.WingAngle == 0f); // 小休止
-        Assert.True(fluttering.Max(x => x.WingAngle) - fluttering.Min(x => x.WingAngle) > Angles.DegToRad(30f), "翼が大きく振れる");
+        Assert.All(fluttering, x => Assert.True(x.WingSpread >= Angles.DegToRad(45f), "翼を大きく広げる"));
+        Assert.Contains(bath, x => x.WingSpread == 0f && x.WingFlap == 0f); // 小休止
+        Assert.True(fluttering.Max(x => x.WingFlap) - fluttering.Min(x => x.WingFlap) > Angles.DegToRad(30f), "翼が大きく振れる");
         Assert.Contains(bath, x => x.Position.Y < -0.01f); // 腹ばいに沈む
         // 体を地面に擦る: 左右の揺れ・前後のゆすり・向きの小刻みな振り
         Assert.Contains(bath, x => MathF.Abs(x.Roll) > Angles.DegToRad(5f));
@@ -81,7 +82,8 @@ public class SparrowDustBathTests
         Assert.Contains(before, x => MathF.Abs(x.Roll) > Angles.DegToRad(10f));
         Assert.Equal(SparrowState.Idle, poses[bathEnd].State);
         Assert.Equal(0f, poses[bathEnd].Roll);
-        Assert.Equal(0f, poses[bathEnd].WingAngle);
+        Assert.Equal(0f, poses[bathEnd].WingSpread);
+        Assert.Equal(0f, poses[bathEnd].WingFlap);
         Assert.Equal(0f, poses[bathEnd].Position.Y, 4);
     }
 
