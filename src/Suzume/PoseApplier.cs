@@ -38,6 +38,13 @@ public sealed unsafe class PoseApplier
     // 最後に再生させたアニメ。0 は未再生
     private ushort lastTimelineId;
 
+    // 羽ばたきアニメ (3) は体を宙に持ち上げるので、胴のボーンの高さを止まり姿勢と比べて差だけ下げる
+    private const long StableIdleMilliseconds = 500;
+    private readonly BoneLocator body = new("n_hara");
+    private float? perchedBodyHeight;
+    private long idleAnimSince = -1;
+    private long lastLiftLog;
+
     public void Apply(Companion* minion, in SparrowPose pose)
     {
         var go = (GameObject*)minion;
@@ -52,6 +59,7 @@ public sealed unsafe class PoseApplier
         if (DrawOffsetIsLocal)
             offset = Vector3.Transform(offset, Quaternion.CreateFromAxisAngle(Vector3.UnitY, -pose.Yaw));
         offset += BaseDrawOffset;
+        offset.Y -= BodyLift(go, pose);
         go->SetDrawOffset(offset.X, offset.Y, offset.Z);
 
         var timelineId = pose.Anim switch
@@ -71,6 +79,42 @@ public sealed unsafe class PoseApplier
 
         if (PitchWrite == PitchMode.Update)
             WritePitch(go, pose);
+    }
+
+    /// <summary>
+    /// 止まり姿勢のときより胴が高く持ち上がっている量。飛行中は高さを行動側で決めているので 0。
+    /// 止まり姿勢が 0.5 秒続いたときの胴の高さを基準にする(アニメの切り替えの混ざりを避ける)。
+    /// </summary>
+    private float BodyLift(GameObject* go, in SparrowPose pose)
+    {
+        var height = body.HeightAboveOrigin(go);
+        if (height is not { } current)
+            return 0f;
+
+        var now = Environment.TickCount64;
+        if (pose.Anim == SparrowAnim.Idle)
+        {
+            if (idleAnimSince < 0)
+                idleAnimSince = now;
+            if (now - idleAnimSince >= StableIdleMilliseconds)
+                perchedBodyHeight = current;
+        }
+        else
+        {
+            idleAnimSince = -1;
+        }
+
+        if (pose.Anim == SparrowAnim.Fly || perchedBodyHeight is not { } perched)
+            return 0f;
+
+        var lift = MathF.Max(0f, current - perched);
+        if (pose.Anim == SparrowAnim.Flutter && lift > 0.01f && now - lastLiftLog > 1000)
+        {
+            lastLiftLog = now;
+            Plugin.Log.Debug($"羽ばたきで胴が {lift:F2} 持ち上がっている分を下げます (止まり {perched:F2} / 今 {current:F2})");
+        }
+
+        return lift;
     }
 
     /// <summary>描画直前に呼ぶ。PitchWrite が Draw のときだけ前傾を書き込む。</summary>

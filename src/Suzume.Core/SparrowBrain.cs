@@ -42,6 +42,7 @@ public sealed class SparrowBrain
 
     // DustBath
     private bool dustBathArmed;
+    private bool dustBathRequested;
     private float dustBathCountdown;
     private bool dustFluttering;
     private float dustPhaseLeft;
@@ -79,6 +80,9 @@ public sealed class SparrowBrain
 
     /// <summary>次の Tick で論理位置へ置き直す(ミニオンの再召喚・一時停止明け)。</summary>
     public void Invalidate() => initialized = false;
+
+    /// <summary>次に地上で落ち着いたとき、すぐに砂浴びを始める(確認用)。</summary>
+    public void RequestDustBath() => dustBathRequested = true;
 
     public SparrowPose Tick(in SparrowInput input)
     {
@@ -316,7 +320,7 @@ public sealed class SparrowBrain
             return;
 
         // 砂浴びの時間が来ていたら、渡り歩きの途中でもその場で始める
-        if (dustBathArmed && dustBathCountdown <= 0f)
+        if (dustBathRequested || (dustBathArmed && dustBathCountdown <= 0f))
             EnterDustBath();
         else if (NeedsToMove(input))
             EnterHop(input);
@@ -503,6 +507,7 @@ public sealed class SparrowBrain
     {
         // 終わったら次の間隔を数え直す
         dustBathArmed = false;
+        dustBathRequested = false;
         SetState(SparrowState.DustBath);
         stateDuration = rng.Range(p.DustBathDurationMin, p.DustBathDurationMax);
         shaking = false;

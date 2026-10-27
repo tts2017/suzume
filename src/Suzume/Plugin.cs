@@ -51,7 +51,7 @@ public sealed class Plugin : IDalamudPlugin
         Framework.Update += OnUpdate;
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
+            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume dust で砂浴び。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
         });
     }
 
@@ -109,6 +109,10 @@ public sealed class Plugin : IDalamudPlugin
                 config.Enabled = parts[0] == "on";
                 config.Save();
                 ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
+                return;
+            case "dust":
+                controller.RequestDustBath();
+                ChatGui.Print("[Suzume] 次に落ち着いたら砂浴びします");
                 return;
             case "probe" when parts.Length >= 2:
                 var id = parts.Length >= 3 && ushort.TryParse(parts[2], out var value) ? value : (ushort)0;

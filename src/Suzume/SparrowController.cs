@@ -76,6 +76,9 @@ public sealed unsafe class SparrowController : IDisposable
             applier.ApplyLate(minion, LastPose);
     }
 
+    /// <summary>確認用: 次に地上で落ち着いたとき砂浴びを始めさせる。</summary>
+    public void RequestDustBath() => brain.RequestDustBath();
+
     /// <summary>上書きをやめ、次に有効になったとき目標地点から始め直す。</summary>
     public void Suspend()
     {

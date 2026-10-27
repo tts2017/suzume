@@ -93,6 +93,19 @@ public class SparrowDustBathTests
     }
 
     [Fact]
+    public void RequestedDustBathStartsAtNextIdle()
+    {
+        var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
+        var brain = new SparrowBrain(p, new SeededRandom(1));
+        brain.Tick(Input());
+
+        brain.RequestDustBath();
+        var poses = Run(brain, Input(), p.IdleMax + 0.5f);
+
+        Assert.Contains(poses, x => x.State == SparrowState.DustBath);
+    }
+
+    [Fact]
     public void DoesNotDustBatheWhilePlayerMoves()
     {
         var p = AlwaysBathe();
