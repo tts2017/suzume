@@ -89,15 +89,15 @@ def regions(maps, original_luma):
     bib_body = (bone == SEBO) & (z > 0.035) & (y > 0.09) & (x < 0.012)
     paint(bib_body, BLACK)
 
-    # 頭: ほっぺ → 頭のてっぺん → のど → くちばしの付け根 → ほっぺの斑点
-    # のどとくちばしの付け根の黒は真ん中だけにする (横に広げると、目の下の帯になって顔が横に広く見える)
+    # 頭 (実物の写真に合わせる): 栗色の帽子は目の高さまで下り、目はくちばしから続く黒い筋の中にある。
+    # のどの黒は くちばしの下だけ。黒い斑点は目より下・後ろの ほっぺの真ん中 (目の高さに置くと、もう 1 つの目に見える)
     paint(head, WHITE)
-    paint(head & ((y > 0.127) | (z < 0.005)), CHESTNUT)
-    paint(head & (y < 0.107) & (z > 0.02) & (x < 0.011), BLACK)
-    paint(head & (z > 0.047) & (x < 0.011), BLACK)
-    # ほっぺの斑点は目の後ろ下に小さく、黒褐色で (真っ黒で目の高さだと、もう 1 つの目に見える)
-    cheek_spot = head & ((x - 0.031) ** 2 + (y - 0.106) ** 2 + (z - 0.008) ** 2 < 0.0075 ** 2)
-    paint(cheek_spot, DARK)
+    paint(head & ((y > 0.119) | (z < 0.0) & (y > 0.105)), CHESTNUT)
+    paint(head & (y < 0.106) & (z > 0.025) & (x < 0.012), BLACK)          # のど
+    paint(head & (z > 0.046) & (x < 0.012) & (y < 0.118), BLACK)          # くちばしの付け根
+    paint(head & (z > 0.045) & (x < 0.017) & (y > 0.104) & (y < 0.117), BLACK)  # 目先 (目とくちばしの間)
+    cheek_spot = head & ((x - 0.030) ** 2 + ((y - 0.102) * 1.2) ** 2 + (z - 0.020) ** 2 < 0.009 ** 2)
+    paint(cheek_spot, BLACK)
 
     # 尾
     paint(bone == TAIL, TAIL_COLOR)
@@ -111,9 +111,9 @@ def regions(maps, original_luma):
     paint(under, WING_UNDER)
     darkness = np.clip((105.0 - original_luma) / 45.0, 0.0, 1.0)[..., None]
     color[top] = (np.array(BROWN) * (1 - darkness) + np.array(DARK) * darkness)[top]
-    # 前縁 (z が大きい側) から少し後ろに、翼の付け根から先へ伸びる白い帯 (中雨覆・大雨覆の先)
-    paint(top & (z > 0.025) & (z < 0.030) & (x < 0.11), WHITE)
-    paint(top & (z > 0.012) & (z < 0.0155) & (x < 0.10), WHITE)
+    # 前縁 (z が大きい側) から少し後ろ、付け根側だけに白い帯 (中雨覆の先) と淡い帯 (大雨覆の先)
+    paint(top & (z > 0.025) & (z < 0.030) & (x < 0.075), WHITE)
+    paint(top & (z > 0.012) & (z < 0.0155) & (x < 0.07), BUFF)
 
     keep = (bone < 0) | np.isin(bone, (MOUTH_UP, MOUTH) + LEGS)
     return color, keep, bone
@@ -133,8 +133,9 @@ def winter_diffuse(maps, original_bgra):
     down = blur(rng.standard_normal((SIZE, SIZE)).astype(np.float32), 1)  # ふわふわした綿毛のむら
     shaded = soft * (1.0 + 1.4 * detail[..., None] + 0.05 * down[..., None])
 
-    # 元の目 (頭の中のとても暗い所) はそのまま残す
-    eye = (bone == KUBI) & (luma < 0.12)
+    # 元の目 (黒目と光) はまわりごとそのまま残す
+    p = maps[..., 1:4]
+    eye = (bone == KUBI) & ((np.abs(p[..., 0]) - 0.019) ** 2 + (p[..., 1] - 0.1105) ** 2 + (p[..., 2] - 0.0425) ** 2 < 0.0062 ** 2)
     result = np.where((keep | eye)[..., None], original, shaded)
     rgb = np.clip(result, 0, 255).astype(np.uint8)
     bgra = np.concatenate([rgb[..., [2, 1, 0]], original_bgra[..., 3:4]], axis=2)
