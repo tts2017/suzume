@@ -49,7 +49,10 @@ BELLY = (208, 202, 190)                # 胸・腹 (灰色がかった白)
 BUFF = greyish((186, 156, 116))        # 脇腹・羽の縁
 TAIL_COLOR = greyish((92, 68, 48))     # 尾
 VENT = greyish((180, 164, 142))        # 尾の下 (淡い灰茶色)
-WING_UNDER = greyish((176, 162, 146))  # 翼の裏
+WING_UNDER = greyish((132, 116, 100), 0.4)         # 翼の裏 (灰褐色)
+WING_UNDER_DARK = greyish((104, 90, 78), 0.4)      # 翼の裏の風切羽の芯
+WING_UNDER_EDGE = greyish((158, 144, 126), 0.4)    # 翼の裏の風切羽の縁
+WING_UNDER_COVERT = greyish((166, 148, 122), 0.4)  # 翼の裏の前の縁側 (雨覆)
 # 翼は写真の赤茶色が残るよう、灰色は控えめに混ぜる
 WING_GREY_MIX = 0.3
 WING_RUFOUS = greyish((156, 98, 56), WING_GREY_MIX)   # 羽の赤茶の縁
@@ -128,6 +131,19 @@ def scale_row(s, t, t0, t1, count, s_max, shift):
     v = (t - t0) / (t1 - t0)
     tip = 1.0 - 0.45 * (2.0 * u) ** 2
     return (s < s_max) & (v >= 0.0) & (v <= tip), u, v / np.maximum(tip, 1e-3)
+
+
+def paint_wing_under(color, under, x, z):
+    """翼の裏を灰褐色に塗る。前の縁側の雨覆は少し明るい黄土がかった灰色、
+    風切羽は灰褐色に、羽の筋を淡く (白く浮かないように表より暗めにする)。"""
+    s = (x - WING_ROOT) / (WING_TIP - WING_ROOT)
+    t = (WING_TOP - z) / (WING_TOP - WING_BOTTOM)
+    color[under] = WING_UNDER
+    across = np.mod(t * 6.0 + 0.15 * s + smooth_noise(13, 3) * 0.04, 1.0)
+    edge = np.abs(across - 0.5) * 2.0
+    color[under & (t > 0.3) & (edge < 0.45)] = WING_UNDER_DARK
+    color[under & (t > 0.3) & (edge > 0.88)] = WING_UNDER_EDGE
+    color[under & (t <= 0.3)] = WING_UNDER_COVERT
 
 
 def paint_wing_top(color, top, x, z):
@@ -231,7 +247,7 @@ def regions(maps, original):
     wing = np.isin(bone, WING_INNER + WING_OUTER)
     under = wing & (row < 135 * SCALE)
     top = wing & ~under
-    paint(under, WING_UNDER)
+    paint_wing_under(color, under, x, z)
     paint_wing_top(color, top, x, z)
 
     keep = (bone < 0) | np.isin(bone, (MOUTH_UP, MOUTH) + LEGS)
