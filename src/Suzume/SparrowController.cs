@@ -25,6 +25,7 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly PoseApplier applier = new();
     private readonly GroundTracker ground = new();
     private readonly RisingEdge beckon = new();
+    private readonly HeadLocator headLocator = new();
     // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
     private readonly ushort[] lastPlayerTimelines = new ushort[3];
     private Vector3? lastPlayerPosition;
@@ -108,7 +109,7 @@ public sealed unsafe class SparrowController : IDisposable
         parameters.FlyDistance = config.FlyDistance;
         parameters.ChirpFrequency = config.ChirpFrequency;
 
-        var head = playerPosition with { Y = playerPosition.Y + HeadHeight(player) };
+        var head = HeadPosition(player, playerPosition);
         LogPlayerTimelineChanges(owner);
         var beckoned = beckon.Update(IsBeckoning(owner));
         if (beckoned)
@@ -129,10 +130,12 @@ public sealed unsafe class SparrowController : IDisposable
             chirpPlayer.Play(kind, ChirpVolume.Compute(config.Volume, Vector3.Distance(playerPosition, pose.Position)));
     }
 
-    private float HeadHeight(GameObject* player)
+    /// <summary>頭頂の位置。骨格から読み、読めなければ GameObject.Height で代用する。設定の補正を足す。</summary>
+    private Vector3 HeadPosition(GameObject* player, Vector3 playerPosition)
     {
-        var height = player->Height is > 0.5f and < 4f ? player->Height : FallbackHeadHeight;
-        return height + config.HeadOffset;
+        var head = headLocator.Find(player)
+            ?? playerPosition with { Y = playerPosition.Y + (player->Height is > 0.5f and < 4f ? player->Height : FallbackHeadHeight) };
+        return head with { Y = head.Y + config.HeadOffset };
     }
 
     /// <summary>プレイヤーが手まねきのエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>
