@@ -38,6 +38,8 @@ public sealed unsafe class SparrowController : IDisposable
     // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
     private readonly ushort[] lastPlayerTimelines = new ushort[3];
     private Vector3? lastPlayerPosition;
+    // 調査用: 高さの記録を 1 秒ごとに出す
+    private long lastHeightLog;
     private int consecutiveErrors;
 
     public SparrowController(Configuration config, ChirpPlayer? chirpPlayer)
@@ -122,6 +124,7 @@ public sealed unsafe class SparrowController : IDisposable
         var feet = playerPosition with { Y = ground.Update(playerPosition.Y, jumping) };
         // 目標地点の高さは、その場所の地面をレイキャストで調べる(斜面でプレイヤーの足元と違うため)
         groundProbe.ReferenceY = feet.Y;
+        groundProbe.Calibrate(playerPosition, grounded: !jumping && !Plugin.Condition[ConditionFlag.Mounted]);
         var target = FollowTarget.For(feet, player->Rotation);
         if (groundProbe.GroundAt(target) is { } targetGround)
             target.Y = targetGround;
@@ -145,6 +148,7 @@ public sealed unsafe class SparrowController : IDisposable
         if (pose.State != LastPose.State)
             Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
         applier.Apply(minion, pose);
+        LogHeights((GameObject*)minion, pose, playerPosition);
         Active = true;
         LastPose = pose;
         LastTarget = target;
@@ -183,6 +187,21 @@ public sealed unsafe class SparrowController : IDisposable
             lastPlayerTimelines[slot] = id;
             Plugin.Log.Debug($"プレイヤー slot{slot} = {id}");
         }
+    }
+
+    /// <summary>調査用: 計算した高さ・地面・実際の描画位置を 1 秒ごとにログに出す(地面に埋まる問題の調査)。</summary>
+    private void LogHeights(GameObject* go, in SparrowPose pose, Vector3 playerPosition)
+    {
+        var now = Environment.TickCount64;
+        if (now - lastHeightLog < 1000)
+            return;
+
+        lastHeightLog = now;
+        var ground = groundProbe.GroundAt(pose.Position);
+        var drawn = go->DrawObject != null ? go->DrawObject->Object.Position.Y : float.NaN;
+        Plugin.Log.Debug(
+            $"高さ {pose.State}: 計算 {pose.Position.Y:F2} 地面 {(ground is { } g ? g.ToString("F2") : "なし")} "
+            + $"プレイヤー {playerPosition.Y:F2} ミニオン {go->Position.Y:F2} オフセット {go->DrawOffset.Y:F2} 描画 {drawn:F2}");
     }
 
     /// <summary>プレイヤーが攻撃的なエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>

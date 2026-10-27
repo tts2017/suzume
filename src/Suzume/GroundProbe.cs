@@ -14,7 +14,17 @@ public sealed class GroundProbe
     /// <summary>探し始める基準の高さ。毎フレーム、プレイヤーの足元の高さを入れる。</summary>
     public float ReferenceY { get; set; }
 
-    public float? GroundAt(Vector3 at)
+    private readonly GroundCalibration calibration = new();
+
+    /// <summary>見た目の地面の高さ(当たり判定にキャラクターの浮きを足したもの)。見つからなければ null。</summary>
+    public float? GroundAt(Vector3 at) =>
+        CollisionAt(at) is { } collision ? calibration.Apply(collision) : null;
+
+    /// <summary>プレイヤーが当たり判定からどれだけ浮いて立っているかを測る。地面に立っているときだけ呼ぶ。</summary>
+    public void Calibrate(Vector3 playerFeet, bool grounded) =>
+        calibration.Update(playerFeet.Y, grounded ? CollisionAt(playerFeet) : null, grounded);
+
+    private float? CollisionAt(Vector3 at)
     {
         var origin = ProbeOrigin.For(at, ReferenceY, StartAbove);
         return BGCollisionModule.RaycastMaterialFilter(origin, -Vector3.UnitY, out var hit, MaxDistance)
