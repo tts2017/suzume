@@ -60,6 +60,9 @@ public sealed class SparrowParams
     public float HeadTiltHoldMax { get; set; } = 0.9f;
     public float NeckSmoothing { get; set; } = 0.1f;
     public float NeckMaxRateDeg { get; set; } = 600f;
+    // 首をかしげるときは「クイッ」と素早く (首を回すより速く。ただし 1 フレームで 14° まで: それ以上はワープに見える)
+    public float HeadTiltSmoothing { get; set; } = 0.04f;
+    public float HeadTiltMaxRateDeg { get; set; } = 840f;
 
     // 尾を跳ね上げる: 飛行からの着地と、ホップの着地
     public float LandTailFlickDeg { get; set; } = 35f;

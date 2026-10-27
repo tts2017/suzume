@@ -45,6 +45,35 @@ public class SparrowGestureTests
         Assert.Contains(poses, x => x.NeckRoll < -Deg(10f));
     }
 
+    // 首をかしげるときは「クイッ」と素早く: 動き始めて 0.08 秒 (5 フレーム) で、かしげ切る角度の 8 割に届く
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void TiltsHeadWithAQuickSnap(int seed)
+    {
+        var p = Calm();
+        p.HeadTiltChance = 1f;
+        var brain = new SparrowBrain(p, new SeededRandom(seed));
+
+        var poses = Run(brain, 10f);
+
+        var checkedTilts = 0;
+        for (var i = 1; i + 30 < poses.Count; i++)
+        {
+            // 正面からかしげ始めたフレーム
+            if (MathF.Abs(poses[i - 1].NeckRoll) > 0.001f || MathF.Abs(poses[i].NeckRoll) < Deg(1f))
+                continue;
+
+            var peak = poses.Skip(i).Take(30).Max(x => MathF.Abs(x.NeckRoll));
+            Assert.True(MathF.Abs(poses[i + 4].NeckRoll) >= peak * 0.8f,
+                $"{i} フレーム目: 5 フレーム後 {poses[i + 4].NeckRoll * 180f / MathF.PI:F1}° / 最大 {peak * 180f / MathF.PI:F1}°");
+            checkedTilts++;
+        }
+
+        Assert.True(checkedTilts > 0, "首をかしげなかった");
+    }
+
     [Fact]
     public void FlicksTailUpOnLanding()
     {

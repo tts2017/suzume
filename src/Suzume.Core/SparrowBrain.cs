@@ -285,7 +285,7 @@ public sealed class SparrowBrain
         var maxNeckStep = Angles.DegToRad(p.NeckMaxRateDeg) * dt;
         shownNeckYaw = ApproachLimited(shownNeckYaw, neckYawTarget, dt, p.NeckSmoothing, maxNeckStep);
         shownNeckPitch = ApproachLimited(shownNeckPitch, neckPitchTarget, dt, p.NeckSmoothing, maxNeckStep);
-        shownNeckRoll = ApproachLimited(shownNeckRoll, headTilt, dt, p.NeckSmoothing, maxNeckStep);
+        shownNeckRoll = ApproachLimited(shownNeckRoll, headTilt, dt, p.HeadTiltSmoothing, Angles.DegToRad(p.HeadTiltMaxRateDeg) * dt);
     }
 
     private static float ApproachLimited(float shown, float target, float dt, float smoothing, float maxStep)
