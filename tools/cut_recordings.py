@@ -5,7 +5,8 @@
 
 使い方:
     dotnet run --project tools/DecodeRecordings -- assets/recordings out/recordings
-    py tools/cut_recordings.py out/recordings assets/sounds
+    dotnet run --project tools/DecodeRecordings -- assets/recordings/montanus out/recordings_montanus
+    py tools/cut_recordings.py out/recordings out/recordings_montanus assets/sounds
 """
 import sys
 import wave
@@ -29,10 +30,21 @@ SEGMENTS = {
     "contact_1": ("vanhecke_XC543237", 4.81, 5.04, 0.01, CLEAR),
     "contact_2": ("vanhecke_XC543237", 11.98, 12.22, 0.01, CLEAR),
     "contact_3": ("vanhecke_XC543237", 23.93, 24.13, 0.01, CLEAR),
+    # 「チュン」地鳴き (日本のスズメ): iNaturalist の山梨の録音 (CC0)。本物らしさを残すため雑音の除去だけかける
+    "contact_4": ("inat_1913285", 2.52, 2.76, 0.01, {"denoise": True}),
+    "contact_5": ("inat_1913285", 4.17, 4.41, 0.01, {"denoise": True}),
+    "contact_6": ("inat_1913285", 5.78, 6.02, 0.01, {"denoise": True}),
     # 「チュンチュン」囀り: Benoît Van Hecke のオスのさえずりから 3 音ずつ、澄ませる
     "song_1": ("vanhecke_XC543237", 4.80, 6.20, 0.02, CLEAR),
     "song_2": ("vanhecke_XC543237", 15.53, 16.57, 0.02, CLEAR),
     "song_3": ("vanhecke_XC543237", 25.49, 26.76, 0.02, CLEAR),
+    # 「チュンチュン」囀り (日本のスズメ): Derek Paulo の録音から。雑音の除去だけかける
+    "song_4": ("commons_XC347807", 3.89, 5.31, 0.02, {"denoise": True}),
+    "song_5": ("commons_XC347807", 7.09, 8.57, 0.02, {"denoise": True}),
+    "song_6": ("commons_XC347807", 16.30, 17.67, 0.02, {"denoise": True}),
+    "song_7": ("commons_XC347806", 1.88, 2.91, 0.02, {"denoise": True}),
+    "song_8": ("commons_XC347806", 8.08, 8.81, 0.02, {"denoise": True}),
+    "song_9": ("commons_XC347806", 13.19, 14.12, 0.02, {"denoise": True}),
     # 「ジュクジュク」警戒・騒ぎ声: Wildlife sound の群れの chattering
     "alarm_1": ("wildlifesound_chattering", 41.55, 42.15, 0.04),
     "alarm_2": ("wildlifesound_chattering", 44.20, 44.80, 0.04),
@@ -123,14 +135,19 @@ def write_wav(path, signal):
         w.writeframes(data.tobytes())
 
 
-def main(recording_dir, out_dir):
-    recording_dir, out = Path(recording_dir), Path(out_dir)
+def main(*args):
+    # 録音のフォルダは複数渡せる (イエスズメ、日本のスズメ)。最後の引数が出力先
+    *recording_dirs, out_dir = [Path(a) for a in args]
+    out = out_dir
     out.mkdir(parents=True, exist_ok=True)
     cache = {}
     for name, (source, start, end, fade_seconds, *options) in SEGMENTS.items():
         options = options[0] if options else {}
         if source not in cache:
-            cache[source] = load(recording_dir / f"{source}.wav")
+            path = next((d / f"{source}.wav" for d in recording_dirs if (d / f"{source}.wav").exists()), None)
+            if path is None:
+                raise FileNotFoundError(f"{source}.wav が見つかりません: {', '.join(map(str, recording_dirs))}")
+            cache[source] = load(path)
         recording = cache[source]
         # フィルタの端の乱れを避けるため、前後に余裕を持たせて処理してから切る
         margin = int(RATE * 0.05)
@@ -152,4 +169,4 @@ def main(recording_dir, out_dir):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(*sys.argv[1:])

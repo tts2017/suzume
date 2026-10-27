@@ -18,7 +18,7 @@ EXPECTED_VARIANTS = 3
 # 鳴き声 4 種はイエスズメの録音から切り出したもの (tools/cut_recordings.py)
 LIMITS = {
     "contact": (0.12, 0.3, 4000, 6500),
-    "song": (0.8, 1.6, 2500, 6500),
+    "song": (0.7, 1.6, 2500, 6500),
     "alarm": (0.5, 0.75, 2000, 8000),
     "flight": (0.35, 0.65, 2500, 7000),
     # 砂浴びの羽音: 低めの「バサバサ」と砂のこすれ
@@ -80,8 +80,8 @@ def main(sound_dir, png_dir=None):
     problems = []
     for kind in LIMITS:
         files = sorted(sound_dir.glob(f"{kind}_*.wav"))
-        if len(files) != EXPECTED_VARIANTS:
-            problems.append(f"{kind}: {len(files)} 個 (期待値 {EXPECTED_VARIANTS} 個)")
+        if len(files) < EXPECTED_VARIANTS:
+            problems.append(f"{kind}: {len(files)} 個 (最低 {EXPECTED_VARIANTS} 個)")
         for path in files:
             samples = check(path, problems)
             if png_dir:

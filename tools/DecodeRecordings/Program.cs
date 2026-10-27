@@ -1,4 +1,4 @@
-// 録音 (mp3 / wav) を 44.1kHz・16bit・モノラルの WAV に変換する。
+// 録音 (mp3 / m4a / wav) を 44.1kHz・16bit・モノラルの WAV に変換する。
 // 使い方: dotnet run --project tools/DecodeRecordings -- <入力フォルダ> <出力フォルダ>
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -12,7 +12,7 @@ if (args.Length != 2)
 }
 
 Directory.CreateDirectory(args[1]);
-foreach (var path in Directory.GetFiles(args[0]).Where(p => p.EndsWith(".mp3") || p.EndsWith(".wav")).Order())
+foreach (var path in Directory.GetFiles(args[0]).Where(p => p.EndsWith(".mp3") || p.EndsWith(".m4a") || p.EndsWith(".wav")).Order())
 {
     using var reader = new MediaFoundationReader(path);
     ISampleProvider samples = reader.ToSampleProvider();
