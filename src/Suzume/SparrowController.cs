@@ -34,6 +34,7 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly RisingEdge beckon = new();
     private readonly RisingEdge aggression = new();
     private readonly HeadLocator headLocator = new();
+    private readonly GroundProbe groundProbe = new();
     // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
     private readonly ushort[] lastPlayerTimelines = new ushort[3];
     private Vector3? lastPlayerPosition;
@@ -44,7 +45,7 @@ public sealed unsafe class SparrowController : IDisposable
         this.config = config;
         this.chirpPlayer = chirpPlayer;
         var random = new SeededRandom(Environment.TickCount);
-        brain = new SparrowBrain(parameters, random);
+        brain = new SparrowBrain(parameters, random, groundProbe.GroundAt);
         scheduler = new ChirpScheduler(parameters, random);
     }
 
@@ -116,7 +117,11 @@ public sealed unsafe class SparrowController : IDisposable
         // タビスズメの論理位置は宙に浮いているので、プレイヤーの足元から地上の目標地点を決める
         var jumping = Plugin.Condition[ConditionFlag.Jumping] || Plugin.Condition[ConditionFlag.Jumping61];
         var feet = playerPosition with { Y = ground.Update(playerPosition.Y, jumping) };
+        // 目標地点の高さは、その場所の地面をレイキャストで調べる(斜面でプレイヤーの足元と違うため)
+        groundProbe.ReferenceY = feet.Y;
         var target = FollowTarget.For(feet, player->Rotation);
+        if (groundProbe.GroundAt(target) is { } targetGround)
+            target.Y = targetGround;
 
         parameters.FlyDistance = config.FlyDistance;
         parameters.ChirpFrequency = config.ChirpFrequency;

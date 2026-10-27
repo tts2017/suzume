@@ -15,6 +15,7 @@ public sealed class SparrowBrain
 
     private readonly SparrowParams p;
     private readonly IRandom rng;
+    private readonly Func<Vector3, float?>? groundAt;
 
     private bool initialized;
     private Vector3 position;
@@ -78,10 +79,12 @@ public sealed class SparrowBrain
     private bool returning;
     private Vector3 landStartPosition;
 
-    public SparrowBrain(SparrowParams parameters, IRandom random)
+    /// <param name="groundAt">その場所の地面の高さ。分からなければ null を返す。省略時は目標地点の高さで代用する</param>
+    public SparrowBrain(SparrowParams parameters, IRandom random, Func<Vector3, float?>? groundAt = null)
     {
         p = parameters;
         rng = random;
+        this.groundAt = groundAt;
     }
 
     /// <summary>次の Tick で論理位置へ置き直す(ミニオンの再召喚・一時停止明け)。</summary>
@@ -180,10 +183,14 @@ public sealed class SparrowBrain
     // ---- 動き回る・頭に乗る ----
 
     private Vector3 Goal(in SparrowInput input) =>
-        scared ? scarePoint with { Y = input.Target.Y }
+        scared ? scarePoint
         : perchIntent ? input.HeadPosition
         : hasWanderPoint ? wanderPoint
         : input.Target;
+
+    /// <summary>地点の高さを、その場所の地面の高さにする。分からなければ渡された高さのまま。</summary>
+    private Vector3 OnGround(Vector3 point) =>
+        groundAt?.Invoke(point) is { } y ? point with { Y = y } : point;
 
     /// <summary>攻撃的なエモートをされた: 警戒の声を上げ、プレイヤーと反対へ飛んで逃げる(頭の上からでも)。</summary>
     private void OnThreatened(in SparrowInput input)
@@ -196,8 +203,9 @@ public sealed class SparrowBrain
 
         scared = true;
         perchIntent = false;
-        scarePoint = input.PlayerPosition + direction * (Angles.HorizontalDistance(position, input.PlayerPosition)
+        var flee = input.PlayerPosition + direction * (Angles.HorizontalDistance(position, input.PlayerPosition)
             + rng.Range(p.ScareFleeDistanceMin, p.ScareFleeDistanceMax));
+        scarePoint = OnGround(flee with { Y = input.Target.Y });
         waryCountdown = rng.Range(p.WaryDurationMin, p.WaryDurationMax);
         alarmCooldown = p.AlarmCooldown;
         triggers |= SparrowTrigger.Alarm;
@@ -239,10 +247,10 @@ public sealed class SparrowBrain
 
         var angle = rng.Range(0f, MathF.Tau);
         var radius = rng.Range(p.WanderRadiusMin, p.WanderRadiusMax);
-        wanderPoint = new Vector3(
+        wanderPoint = OnGround(new Vector3(
             input.PlayerPosition.X + MathF.Sin(angle) * radius,
             input.Target.Y,
-            input.PlayerPosition.Z + MathF.Cos(angle) * radius);
+            input.PlayerPosition.Z + MathF.Cos(angle) * radius));
         wanderCountdown = rng.Range(p.WanderIntervalMin, p.WanderIntervalMax);
         hasWanderPoint = true;
     }
