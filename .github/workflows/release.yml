@@ -1,0 +1,53 @@
+# v1.2.3 の形のタグを push すると、テスト・ビルドして GitHub のリリースに latest.zip を添付し、
+# Dalamud のカスタムプラグインリポジトリ用の repo.json を main に書き込む。
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Dalamud.NET.Sdk は %AppData%\XIVLauncher\addon\Hooks\dev の Dalamud を参照してビルドする
+      - name: Download Dalamud
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Force dalamud.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+
+      - name: Test
+        run: dotnet test tests/Suzume.Core.Tests
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v') + '.0'
+          dotnet build src/Suzume/Suzume.csproj -c Release -p:Version=$version
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: src/Suzume/bin/Release/Suzume/latest.zip
+          generate_release_notes: true
+
+      - name: Update repo.json
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          python tools/make_repo_json.py src/Suzume/bin/Release/Suzume/Suzume.json "${{ github.ref_name }}" repo.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add repo.json
+          git commit -m "chore: publish ${{ github.ref_name }} in repo.json"
+          git push origin main

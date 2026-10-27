@@ -41,17 +41,26 @@ A [Dalamud](https://github.com/goatcorp/Dalamud) plugin that makes the FINAL FAN
 
 ### インストール
 
-まだプラグインリポジトリでは配布していません。自分でビルドして、開発用プラグインとして読み込みます。
+カスタムプラグインリポジトリから入れます。
 
-1. [.NET SDK 10](https://dotnet.microsoft.com/) を入れます。
-2. ビルドします。
+1. Dalamud の設定 (`/xlsettings`) → 実験的機能 → 「カスタムプラグインリポジトリ」に、次の URL を追加して保存します。
 
-   ```sh
-   dotnet build src/Suzume/Suzume.csproj -c Debug
+   ```
+   https://raw.githubusercontent.com/tts2017/suzume/main/repo.json
    ```
 
+2. プラグインインストーラー (`/xlplugins`) で Suzume を探してインストールします。
+
+#### 自分でビルドする場合
+
+1. [.NET SDK 10](https://dotnet.microsoft.com/) を入れます。
+2. `dotnet build src/Suzume/Suzume.csproj -c Debug` でビルドします。
 3. Dalamud の設定 → 実験的機能 → 「開発用プラグインの場所」に、`src/Suzume/bin/Debug` の中の `Suzume.dll` を追加します。
 4. プラグインインストーラーの「開発ツール」から Suzume を有効にします。
+
+#### リリースの出し方
+
+`v1.2.3` の形のタグを push すると、GitHub Actions がテスト・ビルドしてリリースに `latest.zip` を付け、`repo.json` を更新します。
 
 ### 冬羽テクスチャ (おまけ)
 
@@ -102,17 +111,26 @@ The settings cover calls on/off, volume, call frequency, directional calls, the 
 
 ### Installation
 
-It is not in a plugin repository yet. Build it yourself and load it as a dev plugin.
+Install it from a custom plugin repository.
 
-1. Install the [.NET 10 SDK](https://dotnet.microsoft.com/).
-2. Build:
+1. In Dalamud Settings (`/xlsettings`) → Experimental → Custom Plugin Repositories, add this URL and save:
 
-   ```sh
-   dotnet build src/Suzume/Suzume.csproj -c Debug
+   ```
+   https://raw.githubusercontent.com/tts2017/suzume/main/repo.json
    ```
 
+2. Find Suzume in the plugin installer (`/xlplugins`) and install it.
+
+#### Building it yourself
+
+1. Install the [.NET 10 SDK](https://dotnet.microsoft.com/).
+2. Build with `dotnet build src/Suzume/Suzume.csproj -c Debug`.
 3. In Dalamud Settings → Experimental → Dev Plugin Locations, add `Suzume.dll` from `src/Suzume/bin/Debug`.
 4. Enable Suzume under Dev Tools in the plugin installer.
+
+#### Making a release
+
+Pushing a tag like `v1.2.3` makes GitHub Actions test and build the plugin, attach `latest.zip` to a release and update `repo.json`.
 
 ### Winter plumage texture (extra)
 
