@@ -1,7 +1,7 @@
 {
   "Author": "Suzume",
   "Name": "Suzume",
-  "Punchline": "ミニオン「タビスズメ」を本物のスズメらしく動かし、鳴かせます。",
-  "Description": "自分のタビスズメが、両足ホップ・キョロキョロ・ついばみ・波状飛行で動き、行動に合わせて鳴きます。\n/suzume で設定画面を開きます。",
+  "Punchline": "ミニオン「タビスズメ」を本物のスズメらしく動かし、鳴かせます。 / Makes the sparrow minion move and call like a real sparrow.",
+  "Description": "【日本語】\nタビスズメが、両足ホップ・キョロキョロ・ついばみ・波状飛行で動き、行動に合わせて鳴きます。\n/suzume で設定画面を開きます。\n\n[English]\nYour sparrow minion hops with both feet, looks around, pecks and flies in bounding waves, calling to match what it does.\n/suzume opens the settings.\n\n[Deutsch]\nDein Spatz-Begleiter hüpft beidbeinig, schaut sich um, pickt und fliegt in Wellen, mit passenden Rufen.\n/suzume öffnet die Einstellungen.\n\n[Français]\nVotre mascotte moineau sautille à pieds joints, regarde autour d'elle, picore et vole en ondulant, avec des cris adaptés.\n/suzume ouvre les paramètres.",
   "Tags": [ "minion", "companion" ]
 }
