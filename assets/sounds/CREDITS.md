@@ -1,6 +1,6 @@
 # 音声のクレジット
 
-鳴き声 4 種 (`contact` `song` `alarm` `flight`) は、Wikimedia Commons と iNaturalist で公開されているイエスズメ (*Passer domesticus*) と日本のスズメ (*Passer montanus*) の録音から切り出し、低音の雑音を落として音量をそろえたものです。`contact_1〜3`・`song_1〜3`・`flight` はさらに背景雑音を差し引き、主な音の筋以外の濁りを弱め、再生速度を 1.12 倍にして少し高くしています。日本のスズメから切り出したもの (`contact_4〜6`・`song_4〜9`) は、本物らしさを残すため背景雑音を差し引くだけにしています。元の録音は `assets/recordings/` (イエスズメ) と `assets/recordings/montanus/` (日本のスズメ) にあります。切り出し方は `tools/cut_recordings.py` を参照してください。
+鳴き声 4 種 (`contact` `song` `alarm` `flight`) は、Wikimedia Commons と iNaturalist で公開されているイエスズメ (*Passer domesticus*) と日本のスズメ (*Passer montanus*) の録音から切り出し、低音の雑音を落として音量をそろえたものです。`contact_1〜3`・`song_1〜3`・`flight` はさらに背景雑音を差し引き、主な音の筋以外の濁りを弱め、再生速度を 1.12 倍にして少し高くしています。日本のスズメから切り出したもの (`song_4〜9`) は、本物らしさを残すため背景雑音を差し引くだけにしています。`contact_4〜6` は元の録音に川の流れの音が入っているので、背景雑音を強めに差し引き、主な音の筋の外を弱めています (高さは変えていません)。`alarm` も背景のザーッという音を差し引いています。元の録音は `assets/recordings/` (イエスズメ) と `assets/recordings/montanus/` (日本のスズメ) にあります。切り出し方は `tools/cut_recordings.py` を参照してください。
 
 砂浴びの羽音 (`dust`) は `tools/chirps.py` で合成したものです。
 

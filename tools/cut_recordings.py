@@ -23,17 +23,20 @@ HIGHPASS_HZ = 1000
 # 鳴き声を澄ませる加工 (チュン・さえずり・飛び立ちに使う)
 CLEAR = {"pitch": 1.12, "denoise": True, "tonal": True}
 
-# 加工: pitch = 再生速度の倍率 (高くなり短くなる)、denoise = 背景雑音を差し引く、
-#       tonal = 主な音の筋 (基本音と 2 倍音) だけを残して濁りを弱める
+# 川の流れのような、ずっと鳴っている広い帯域の背景がある録音用: 強く差し引き、主な音の筋の外を弱める (高さは変えない)
+STREAM = {"denoise": 3.0, "tonal": 0.3}
+
+# 加工: pitch = 再生速度の倍率 (高くなり短くなる)、denoise = 背景雑音を差し引く (数値なら差し引く強さ、True は 1.5)、
+#       tonal = 主な音の筋 (基本音と 2 倍音) だけを残して濁りを弱める (数値なら筋の外を残す割合、True は 0.15)
 SEGMENTS = {
     # 「チュン」地鳴き: Benoît Van Hecke のさえずりから、高く澄んだ単発の声を選び、少し高くして雑音を除く
     "contact_1": ("vanhecke_XC543237", 4.81, 5.04, 0.01, CLEAR),
     "contact_2": ("vanhecke_XC543237", 11.98, 12.22, 0.01, CLEAR),
     "contact_3": ("vanhecke_XC543237", 23.93, 24.13, 0.01, CLEAR),
-    # 「チュン」地鳴き (日本のスズメ): iNaturalist の山梨の録音 (CC0)。本物らしさを残すため雑音の除去だけかける
-    "contact_4": ("inat_1913285", 2.52, 2.76, 0.01, {"denoise": True}),
-    "contact_5": ("inat_1913285", 4.17, 4.41, 0.01, {"denoise": True}),
-    "contact_6": ("inat_1913285", 5.78, 6.02, 0.01, {"denoise": True}),
+    # 「チュン」地鳴き (日本のスズメ): iNaturalist の山梨の録音 (CC0)。川の流れの音が入っているので強めに除く
+    "contact_4": ("inat_1913285", 2.52, 2.76, 0.01, STREAM),
+    "contact_5": ("inat_1913285", 4.17, 4.41, 0.01, STREAM),
+    "contact_6": ("inat_1913285", 5.78, 6.02, 0.01, STREAM),
     # 「チュンチュン」囀り: Benoît Van Hecke のオスのさえずりから 3 音ずつ、澄ませる
     "song_1": ("vanhecke_XC543237", 4.80, 6.20, 0.02, CLEAR),
     "song_2": ("vanhecke_XC543237", 15.53, 16.57, 0.02, CLEAR),
@@ -45,10 +48,11 @@ SEGMENTS = {
     "song_7": ("commons_XC347806", 1.88, 2.91, 0.02, {"denoise": True}),
     "song_8": ("commons_XC347806", 8.08, 8.81, 0.02, {"denoise": True}),
     "song_9": ("commons_XC347806", 13.19, 14.12, 0.02, {"denoise": True}),
-    # 「ジュクジュク」警戒・騒ぎ声: Wildlife sound の群れの chattering
-    "alarm_1": ("wildlifesound_chattering", 41.55, 42.15, 0.04),
-    "alarm_2": ("wildlifesound_chattering", 44.20, 44.80, 0.04),
-    "alarm_3": ("wildlifesound_chattering", 15.15, 15.75, 0.04),
+    # 「ジュクジュク」警戒・騒ぎ声: Wildlife sound の群れの chattering。背景のザーッという音を差し引く
+    # (濁った声なので、音の筋だけを残す加工はかけない)
+    "alarm_1": ("wildlifesound_chattering", 41.55, 42.15, 0.04, {"denoise": 2.5}),
+    "alarm_2": ("wildlifesound_chattering", 44.20, 44.80, 0.04, {"denoise": 2.5}),
+    "alarm_3": ("wildlifesound_chattering", 15.15, 15.75, 0.04, {"denoise": 2.5}),
     # 「チュリッ」飛び立ち: ngoomie の掛け合いから 2 山の声、澄ませる
     "flight_1": ("ngoomie_202279702", 2.14, 2.58, 0.01, CLEAR),
     "flight_2": ("ngoomie_202279702", 4.75, 5.24, 0.01, CLEAR),
@@ -156,9 +160,11 @@ def main(*args):
         piece = piece[a - max(0, a - margin):][:b - a]
         if options.get("denoise"):
             context = highpass(recording[max(0, a - RATE * 2):b + RATE * 2], HIGHPASS_HZ)
-            piece = denoise(piece, context)
+            strength = options["denoise"]
+            piece = denoise(piece, context, strength=1.5 if strength is True else strength)
         if options.get("tonal"):
-            piece = tonal(piece)
+            residual = options["tonal"]
+            piece = tonal(piece, residual=0.15 if residual is True else residual)
         if "pitch" in options:
             piece = pitch_up(piece, options["pitch"])
         piece = fade(piece - np.mean(piece), fade_seconds)
