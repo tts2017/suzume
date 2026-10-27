@@ -1,6 +1,8 @@
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Plugin.Services;
+using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Suzume.Core;
 
@@ -116,6 +118,7 @@ public sealed unsafe class SparrowController : IDisposable
             dt,
             localPlayer->Position,
             localPlayer->Rotation,
+            CameraForward(localPlayer->Rotation),
             localAggression.Update(SparrowAgent.IsAggressive(localCharacter)),
             localJumping,
             localMounted);
@@ -201,4 +204,21 @@ public sealed unsafe class SparrowController : IDisposable
     private static bool IsLocalAirborneOrInWater() => LocalAirFlags.Any(flag => Plugin.Condition[flag]);
 
     public void Dispose() => Suspend();
+
+    /// <summary>カメラが向いている方向。カメラが取れなければキャラクターの向き。</summary>
+    private static Vector3 CameraForward(float playerYaw)
+    {
+        var manager = CameraManager.Instance();
+        var camera = manager != null ? manager->GetActiveCamera() : null;
+        if (camera != null)
+        {
+            var scene = &camera->CameraBase.SceneCamera;
+            Vector3 lookAt = scene->LookAtVector;
+            Vector3 position = scene->Object.Position;
+            var forward = lookAt - position;
+            if (forward.LengthSquared() > 1e-6f)
+                return forward;
+        }
+        return new Vector3(MathF.Sin(playerYaw), 0f, MathF.Cos(playerYaw));
+    }
 }

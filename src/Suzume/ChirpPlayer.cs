@@ -5,11 +5,12 @@ using Suzume.Core;
 
 namespace Suzume;
 
-/// <summary>埋め込みの WAV を NAudio で鳴らす。同時再生は最大 2 つ。</summary>
+/// <summary>埋め込みの WAV (モノラル) を NAudio で左右に振り分けて鳴らす。同時再生は最大 2 つ。</summary>
 public sealed class ChirpPlayer : IDisposable
 {
     private const int MaxConcurrent = 2;
-    private static readonly WaveFormat Format = WaveFormat.CreateIeeeFloatWaveFormat(44100, 1);
+    private static readonly WaveFormat ClipFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 1);
+    private static readonly WaveFormat Format = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
 
     private readonly Dictionary<ChirpKind, float[][]> clips = new();
     private readonly MixingSampleProvider mixer = new(Format) { ReadFully = true };
@@ -26,14 +27,14 @@ public sealed class ChirpPlayer : IDisposable
         output.Play();
     }
 
-    public void Play(ChirpKind kind, float volume)
+    public void Play(ChirpKind kind, float volume, StereoPlacement placement)
     {
         if (volume <= 0f || mixer.MixerInputs.Count() >= MaxConcurrent)
             return;
 
         var variants = clips[kind];
         var clip = variants[random.Next(variants.Length)];
-        mixer.AddMixerInput(new VolumeSampleProvider(new ClipSampleProvider(clip)) { Volume = volume });
+        mixer.AddMixerInput(new StereoClipSampleProvider(clip, volume, placement));
     }
 
     public void Dispose()
@@ -62,7 +63,7 @@ public sealed class ChirpPlayer : IDisposable
             ?? throw new InvalidOperationException($"リソースを開けません: {name}");
         using var reader = new WaveFileReader(stream);
         var provider = reader.ToSampleProvider();
-        if (provider.WaveFormat.SampleRate != Format.SampleRate || provider.WaveFormat.Channels != Format.Channels)
+        if (provider.WaveFormat.SampleRate != ClipFormat.SampleRate || provider.WaveFormat.Channels != ClipFormat.Channels)
             throw new InvalidOperationException($"{name} は 44.1kHz モノラルではありません");
 
         var samples = new List<float>();
@@ -73,19 +74,28 @@ public sealed class ChirpPlayer : IDisposable
         return samples.ToArray();
     }
 
-    /// <summary>メモリ上の 1 クリップを最後まで流す。</summary>
-    private sealed class ClipSampleProvider(float[] clip) : ISampleProvider
+    /// <summary>メモリ上のモノラル 1 クリップを、左右の耳ごとの音量と遅れを付けて最後まで流す。</summary>
+    private sealed class StereoClipSampleProvider(float[] clip, float volume, StereoPlacement placement) : ISampleProvider
     {
+        private readonly float leftGain = volume * placement.LeftGain;
+        private readonly float rightGain = volume * placement.RightGain;
+        private readonly int frames = clip.Length + Math.Max(placement.LeftDelaySamples, placement.RightDelaySamples);
         private int position;
 
         public WaveFormat WaveFormat => Format;
 
         public int Read(float[] buffer, int offset, int count)
         {
-            var n = Math.Min(count, clip.Length - position);
-            Array.Copy(clip, position, buffer, offset, n);
-            position += n;
-            return n;
+            var n = Math.Min(count / 2, frames - position);
+            for (var i = 0; i < n; i++, position++)
+            {
+                buffer[offset + i * 2] = Sample(position - placement.LeftDelaySamples) * leftGain;
+                buffer[offset + i * 2 + 1] = Sample(position - placement.RightDelaySamples) * rightGain;
+            }
+            return n * 2;
         }
+
+        private float Sample(int index) =>
+            index >= 0 && index < clip.Length ? clip[index] : 0f;
     }
 }

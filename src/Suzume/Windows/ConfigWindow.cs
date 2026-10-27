@@ -51,6 +51,13 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var stereo = config.StereoSound;
+        if (ImGui.Checkbox("鳴き声を左右に定位 (スズメのいる向きから聞こえる)", ref stereo))
+        {
+            config.StereoSound = stereo;
+            changed = true;
+        }
+
         var volume = config.Volume;
         if (ImGui.SliderFloat("音量", ref volume, 0f, 1f))
         {

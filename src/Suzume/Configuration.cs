@@ -12,6 +12,8 @@ public sealed class Configuration : IPluginConfiguration
     public bool IncludeOthers { get; set; } = true;
     public bool SoundEnabled { get; set; } = true;
     public float Volume { get; set; } = 0.6f;
+    // スズメのいる向きで、左右の耳の音量と届く時間をずらす
+    public bool StereoSound { get; set; } = true;
     public float ChirpFrequency { get; set; } = 1.0f;
     public float FlyDistance { get; set; } = 6f;
     // 頭に乗るときの高さの補正 (yalm)。キャラクターの身長に合わせて調整する

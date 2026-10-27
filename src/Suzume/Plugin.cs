@@ -22,6 +22,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static IGameInteropProvider Interop { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
 
     private readonly Configuration config;
     private readonly WindowSystem windowSystem = new("Suzume");
@@ -46,7 +47,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         controller = new SparrowController(config, chirpPlayer, bonePoser);
-        configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume), controller.ResetPosition);
+        configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume, StereoPlacement.Centre), controller.ResetPosition);
         windowSystem.AddWindow(configWindow);
         PluginInterface.UiBuilder.Draw += OnDraw;
         PluginInterface.UiBuilder.OpenConfigUi += configWindow.Toggle;
