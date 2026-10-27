@@ -79,6 +79,23 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var puffed = config.Puffed;
+        if (ImGui.Checkbox("ふくら雀 (羽毛をふくらませた丸い形)", ref puffed))
+        {
+            config.Puffed = puffed;
+            changed = true;
+        }
+
+        if (config.Puffed)
+        {
+            var puffAmount = config.PuffAmount * 100f;
+            if (ImGui.SliderFloat("ふくらみ (%)", ref puffAmount, 5f, 30f, "%.0f"))
+            {
+                config.PuffAmount = puffAmount / 100f;
+                changed = true;
+            }
+        }
+
         ImGui.TextDisabled("/beckon (手まねき) で頭に乗り、もう一度で下ります");
         ImGui.TextDisabled("スズメに向けて /angry /furious /slap /battlestance /box /stomp /throw をすると逃げます");
 

@@ -16,6 +16,10 @@ public sealed class Configuration : IPluginConfiguration
     public float FlyDistance { get; set; } = 6f;
     // 頭に乗るときの高さの補正 (yalm)。キャラクターの身長に合わせて調整する
     public float HeadOffset { get; set; }
+    // ふくら雀: 冬のスズメのように羽毛をふくらませた丸い形にする
+    public bool Puffed { get; set; } = true;
+    // 体をどれだけ大きくするか (0.15 で 15%)
+    public float PuffAmount { get; set; } = 0.15f;
     public bool ShowDebug { get; set; }
 
     public void Normalize()
@@ -24,6 +28,7 @@ public sealed class Configuration : IPluginConfiguration
         ChirpFrequency = Math.Clamp(ChirpFrequency, 0f, 3f);
         FlyDistance = Math.Clamp(FlyDistance, 2f, 20f);
         HeadOffset = Math.Clamp(HeadOffset, -1f, 1f);
+        PuffAmount = Math.Clamp(PuffAmount, 0.05f, 0.3f);
     }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);

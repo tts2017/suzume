@@ -30,6 +30,8 @@ public sealed unsafe class BonePoser : IDisposable
     private readonly object gate = new();
     // 骨格ごとのボーン番号 (タビスズメはどれも同じ骨格なので、たいてい 1 つ)
     private readonly Dictionary<nint, Dictionary<string, int>> boneIndexBySkeleton = new();
+    // 骨格ごとの、ふくら雀の倍率 (ふくらませ具合が変わったら作り直す)
+    private readonly Dictionary<nint, (float Amount, float[] Factors)> puffBySkeleton = new();
 
     public BonePoser()
     {
@@ -43,6 +45,9 @@ public sealed unsafe class BonePoser : IDisposable
         updateHook = Plugin.Interop.HookFromAddress<Skeleton.Delegates.UpdateAnimations>(update, UpdateAnimationsDetour);
         updateHook.Enable();
     }
+
+    /// <summary>ふくら雀: 体をどれだけ大きくするか (0.15 で 15%)。0 で元の形。</summary>
+    public float Puff { get; set; }
 
     /// <summary>毎フレーム制御側が入れる。すべて 0 ならアニメのまま。</summary>
     public void SetPose(ushort objectIndex, nint minion, in SparrowPose pose)
@@ -76,8 +81,8 @@ public sealed unsafe class BonePoser : IDisposable
     private static bool IsSameObject(ushort objectIndex, nint minion) =>
         Plugin.ObjectTable[objectIndex] is { } obj && obj.Address == minion;
 
-    private static bool HasBoneWork(in SparrowPose pose) =>
-        pose.WingSpread != 0f || pose.WingFlap != 0f || pose.NeckYaw != 0f || pose.NeckPitch != 0f || pose.NeckRoll != 0f || pose.TailLift != 0f;
+    private bool HasBoneWork(in SparrowPose pose) =>
+        Puff > 0f || pose.WingSpread != 0f || pose.WingFlap != 0f || pose.NeckYaw != 0f || pose.NeckPitch != 0f || pose.NeckRoll != 0f || pose.TailLift != 0f;
 
     private void UpdateAnimationsDetour(Skeleton* first, float deltaTime)
     {
@@ -147,8 +152,46 @@ public sealed unsafe class BonePoser : IDisposable
             local->Rotation.W = rotation.W;
         }
 
+        if (Puff > 0f)
+            ApplyPuff(pose);
+
         // 書き換えた局所の回転から、子のボーン (翼の先・頭・尾の先) を含めてモデル空間を計算し直す
         pose->AccessSyncedPoseModelSpace();
+    }
+
+    /// <summary>ふくら雀: 体のボーンを大きくし、子では割り戻して くちばし・翼・尾・脚を元の大きさに保つ。</summary>
+    private void ApplyPuff(hkaPose* pose)
+    {
+        var skeleton = pose->Skeleton;
+        if (!puffBySkeleton.TryGetValue((nint)skeleton, out var cached) || cached.Amount != Puff)
+        {
+            var count = skeleton->Bones.Length;
+            var names = new string?[count];
+            var parents = new int[count];
+            for (var bone = 0; bone < count; bone++)
+            {
+                names[bone] = skeleton->Bones[bone].Name.String;
+                parents[bone] = skeleton->ParentIndices[bone];
+            }
+
+            cached = (Puff, PuffScale.LocalFactors(names, parents, Puff));
+            puffBySkeleton[(nint)skeleton] = cached;
+            Plugin.Log.Debug("ふくら雀の骨格: " + string.Join(", ", Enumerable.Range(0, count)
+                .Select(b => $"{names[b]}<{(parents[b] >= 0 ? names[parents[b]] : "-")} x{cached.Factors[b]:F3}")));
+        }
+
+        for (var bone = 0; bone < cached.Factors.Length; bone++)
+        {
+            var factor = cached.Factors[bone];
+            if (factor == 1f)
+                continue;
+
+            // アニメの大きさは 1 なので、掛け算でなく代入する (毎フレーム積み重なって大きくなり続けないように)
+            var local = pose->AccessBoneLocalSpace(bone);
+            local->Scale.X = factor;
+            local->Scale.Y = factor;
+            local->Scale.Z = factor;
+        }
     }
 
     private static void AddWing(hkaPose* pose, FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model,

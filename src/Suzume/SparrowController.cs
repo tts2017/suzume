@@ -102,6 +102,8 @@ public sealed unsafe class SparrowController : IDisposable
             return;
         }
 
+        bonePoser.Puff = config.Puffed ? config.PuffAmount : 0f;
+
         var localCharacter = (Character*)local.Address;
         var localPlayer = (GameObject*)localCharacter;
         var localJumping = Plugin.Condition[ConditionFlag.Jumping] || Plugin.Condition[ConditionFlag.Jumping61];
