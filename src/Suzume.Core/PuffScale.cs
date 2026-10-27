@@ -2,7 +2,8 @@ namespace Suzume.Core;
 
 /// <summary>
 /// 冬のスズメが羽毛をふくらませた「ふくら雀」の形にするための、ボーンごとの大きさ。
-/// 体 (腰・背) を大きく、頭は少しだけ大きくし、くちばし・翼・尾・脚は元の大きさのままにする。
+/// 体 (腰・背) と翼を大きく、頭は少しだけ大きくし、くちばし・尾・脚は元の大きさのままにする。
+/// 翼は体と同じだけ大きくする (元の大きさのままだと、たたんだ翼がふくらんだ体に埋まる)。
 /// 骨格の大きさは親から子へ掛け合わされるので、子では親の分を割り戻す。
 /// </summary>
 public static class PuffScale
@@ -14,6 +15,7 @@ public static class PuffScale
     public static float Target(string? bone, float amount) => bone switch
     {
         "j_kosi" or "j_sebo" => 1f + amount,
+        not null when bone.StartsWith("j_ude_", StringComparison.Ordinal) => 1f + amount,
         "j_kubi" => 1f + amount * HeadShare,
         _ => 1f,
     };

@@ -36,15 +36,23 @@ public class PuffScaleTests
         Assert.True(head > 1.01f && head < 1.1f, $"頭 {head}");
     }
 
+    // 翼は体と同じだけ大きくする (元の大きさのままだと、たたんだ翼がふくらんだ体に埋まる)
     [Theory]
-    [InlineData("j_mouth")]
     [InlineData("j_ude_a_l")]
     [InlineData("j_ude_b_l")]
+    public void WingsGrowWithTheBody(string bone)
+    {
+        var factors = PuffScale.LocalFactors(Names, Parents, 0.15f);
+        Assert.Equal(1.15f, ModelScale(factors, bone), 4);
+    }
+
+    [Theory]
+    [InlineData("j_mouth")]
     [InlineData("j_tail")]
     [InlineData("j_asi_a_l")]
     [InlineData("j_asi_b_l")]
     [InlineData("n_root")]
-    public void BeakWingsTailAndLegsKeepTheirSize(string bone)
+    public void BeakTailAndLegsKeepTheirSize(string bone)
     {
         var factors = PuffScale.LocalFactors(Names, Parents, 0.15f);
         Assert.Equal(1f, ModelScale(factors, bone), 4);

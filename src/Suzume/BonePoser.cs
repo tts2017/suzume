@@ -159,7 +159,7 @@ public sealed unsafe class BonePoser : IDisposable
         pose->AccessSyncedPoseModelSpace();
     }
 
-    /// <summary>ふくら雀: 体のボーンを大きくし、子では割り戻して くちばし・翼・尾・脚を元の大きさに保つ。</summary>
+    /// <summary>ふくら雀: 体と翼のボーンを大きくし、子では割り戻して くちばし・尾・脚を元の大きさに保つ。</summary>
     private void ApplyPuff(hkaPose* pose)
     {
         var skeleton = pose->Skeleton;
