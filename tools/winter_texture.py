@@ -141,10 +141,10 @@ def regions(maps, original):
     across = np.mod((z + 0.12 * (x - 0.03)) / width + sway, 1.0)
     edge = np.abs(across - 0.5) * 2.0          # 0 が羽の芯、1 が縁
     flight = top & (z < 0.024)
-    paint(flight & (edge < 0.5), DARK)
-    paint(flight & (edge >= 0.5) & (edge < 0.8), BROWN)
-    paint(flight & (edge >= 0.8), BUFF)
-    paint(flight & (edge >= 0.9), FRINGE)      # 羽の感じを出す白い縁取り
+    paint(flight & (edge < 0.45), DARK)
+    paint(flight & (edge >= 0.45) & (edge < 0.65), BROWN)
+    paint(flight & (edge >= 0.65), BUFF)
+    paint(flight & (edge >= 0.75), FRINGE)     # 羽の感じを出す白い縁取り
     # 前縁 (z が大きい側) から少し後ろ、付け根側だけに白い帯 (中雨覆の先) と淡い帯 (大雨覆の先)
     paint(top & (z > 0.025) & (z < 0.030) & (x < 0.075), WHITE)
     paint(top & (z > 0.012) & (z < 0.0155) & (x < 0.07), BUFF)
