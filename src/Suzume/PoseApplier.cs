@@ -44,6 +44,10 @@ public sealed unsafe class PoseApplier
     private float? perchedBodyHeight;
     private long idleAnimSince = -1;
     private long lastLiftLog;
+    // ゲームが勝手に別のアニメへ切り替えたとき、指定のアニメを再生し直す間隔 (取り合いで毎フレーム止まらないように)
+    private const long ReplayIntervalMilliseconds = 250;
+    private long lastReplay;
+    private long lastReplayLog;
 
     public void Apply(Companion* minion, in SparrowPose pose)
     {
@@ -70,11 +74,22 @@ public sealed unsafe class PoseApplier
         };
         var timeline = &((Character*)minion)->Timeline;
         timeline->BaseOverride = timelineId;
-        // AI を止めているとゲームがベースアニメを選び直さないので、切り替わったときに 1 回だけ直接再生する
-        if (lastTimelineId != timelineId)
+        // AI を止めているとゲームがベースアニメを選び直さないので、切り替わったときに直接再生する。
+        // また、位置を毎フレーム動かすとゲームが移動中と見なして自分の羽ばたき (4) に切り替えることがあり、
+        // そのままだと跳ねるはずが地面すれすれを飛んで見えるので、食い違ったら再生し直す
+        var now = Environment.TickCount64;
+        var playing = timeline->TimelineSequencer.GetSlotTimeline(0);
+        var replay = lastTimelineId == timelineId && playing != timelineId && now - lastReplay >= ReplayIntervalMilliseconds;
+        if (lastTimelineId != timelineId || replay)
         {
             timeline->TimelineSequencer.PlayTimeline(timelineId, null);
             lastTimelineId = timelineId;
+            lastReplay = now;
+            if (replay && now - lastReplayLog >= 5000)
+            {
+                lastReplayLog = now;
+                Plugin.Log.Debug($"ゲームがアニメを {playing} に切り替えたので {timelineId} を再生し直しました (状態 {pose.State})");
+            }
         }
 
         if (PitchWrite == PitchMode.Update)
