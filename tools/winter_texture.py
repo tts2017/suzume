@@ -29,7 +29,7 @@ WING_INNER, WING_OUTER = (10, 13), (11, 12)
 
 # 日本のスズメの冬羽の色 (sRGB)
 # 茶色の部分は灰色に寄せる (GREY_MIX の割合だけ、同じ明るさの灰色を混ぜる)
-GREY_MIX = 0.45
+GREY_MIX = 0.7
 
 
 def greyish(rgb, mix=GREY_MIX):
@@ -133,6 +133,16 @@ def regions(maps, original):
     paint(under, WING_UNDER)
     darkness = np.clip((105.0 - original_luma) / 45.0, 0.0, 1.0)[..., None]
     color[top] = (np.array(BROWN) * (1 - darkness) + np.array(DARK) * darkness)[top]
+    # 前縁から後ろの羽 (風切羽・三列風切): 付け根から先へ並ぶ細長い羽。1 枚ごとに黒い芯・茶色・淡い縁が、
+    # 羽の向き (後ろへ行くほど少し外へ流れる斜め) に筋になる。付け根側の三列風切は幅が広い
+    width = np.where(x < 0.06, 0.02, 0.015)
+    sway = blur(np.random.default_rng(11).standard_normal((SIZE, SIZE)).astype(np.float32), 3) * 0.08
+    across = np.mod((x + 0.15 * (0.04 - z)) / width + sway, 1.0)
+    edge = np.abs(across - 0.5) * 2.0          # 0 が羽の芯、1 が縁
+    flight = top & (z < 0.024)
+    paint(flight & (edge < 0.5), DARK)
+    paint(flight & (edge >= 0.5) & (edge < 0.8), BROWN)
+    paint(flight & (edge >= 0.8), BUFF)
     # 前縁 (z が大きい側) から少し後ろ、付け根側だけに白い帯 (中雨覆の先) と淡い帯 (大雨覆の先)
     paint(top & (z > 0.025) & (z < 0.030) & (x < 0.075), WHITE)
     paint(top & (z > 0.012) & (z < 0.0155) & (x < 0.07), BUFF)
