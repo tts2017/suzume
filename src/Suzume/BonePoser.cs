@@ -31,7 +31,9 @@ public sealed unsafe class BonePoser : IDisposable
     // 骨格ごとのボーン番号 (タビスズメはどれも同じ骨格なので、たいてい 1 つ)
     private readonly Dictionary<nint, Dictionary<string, int>> boneIndexBySkeleton = new();
     // 骨格ごとの、ふくら雀の倍率 (ふくらませ具合が変わったら作り直す)
-    private readonly Dictionary<nint, (float Amount, float[] Factors)> puffBySkeleton = new();
+    private readonly Dictionary<nint, (float Amount, float[] Factors, float[] Moves)> puffBySkeleton = new();
+    // 調査用: ふくらみを変えた直後と、その少しあとに骨の位置を書き出す (位置が積み重なって伸び続けていないかを見る)
+    private int dumpPuffFrames = -1;
 
     public BonePoser()
     {
@@ -156,10 +158,30 @@ public sealed unsafe class BonePoser : IDisposable
             ApplyPuff(pose);
 
         // 書き換えた局所の回転から、子のボーン (翼の先・頭・尾の先) を含めてモデル空間を計算し直す
-        pose->AccessSyncedPoseModelSpace();
+        var synced = pose->AccessSyncedPoseModelSpace();
+
+        // 調査用: ふくらみを変えた直後に 1 回、体と翼の骨のモデル空間の位置と大きさを書き出す
+        if (dumpPuffFrames >= 0 && dumpPuffFrames-- % 300 == 0)
+        {
+            var names = new[] { "j_kosi", "j_sebo", "j_kubi", LeftWing, LeftWingTip, Tail, "j_asi_a_l" };
+            Plugin.Log.Debug($"ふくら雀 {Puff:F2} のモデル空間: " + string.Join(", ", names.Select(name =>
+            {
+                for (var b = 0; b < pose->Skeleton->Bones.Length; b++)
+                {
+                    if (pose->Skeleton->Bones[b].Name.String != name)
+                        continue;
+                    var t = synced->Data[b];
+                    var l = pose->AccessBoneLocalSpace(b);
+                    return $"{name} 位置({t.Translation.X:F3},{t.Translation.Y:F3},{t.Translation.Z:F3}) 大きさ{t.Scale.X:F3} 局所{l->Scale.X:F3}";
+                }
+
+                return $"{name} なし";
+            })));
+        }
     }
 
-    /// <summary>ふくら雀: 体と翼のボーンを大きくし、子では割り戻して くちばし・尾・脚を元の大きさに保つ。</summary>
+    /// <summary>ふくら雀: 体と翼のボーンを大きくし、子では割り戻して くちばし・尾・脚を元の大きさに保つ。
+    /// 子の位置も伸ばして、翼・頭・尾・脚が ふくらんだ体についてくるようにする。</summary>
     private void ApplyPuff(hkaPose* pose)
     {
         var skeleton = pose->Skeleton;
@@ -174,8 +196,9 @@ public sealed unsafe class BonePoser : IDisposable
                 parents[bone] = skeleton->ParentIndices[bone];
             }
 
-            cached = (Puff, PuffScale.LocalFactors(names, parents, Puff));
+            cached = (Puff, PuffScale.LocalFactors(names, parents, Puff), PuffScale.TranslationFactors(names, parents, Puff));
             puffBySkeleton[(nint)skeleton] = cached;
+            dumpPuffFrames = 300;
             Plugin.Log.Debug("ふくら雀の骨格: " + string.Join(", ", Enumerable.Range(0, count)
                 .Select(b => $"{names[b]}<{(parents[b] >= 0 ? names[parents[b]] : "-")} x{cached.Factors[b]:F3}")));
         }
@@ -183,14 +206,27 @@ public sealed unsafe class BonePoser : IDisposable
         for (var bone = 0; bone < cached.Factors.Length; bone++)
         {
             var factor = cached.Factors[bone];
-            if (factor == 1f)
+            var move = cached.Moves[bone];
+            if (factor == 1f && move == 1f)
                 continue;
 
-            // アニメの大きさは 1 なので、掛け算でなく代入する (毎フレーム積み重なって大きくなり続けないように)
             var local = pose->AccessBoneLocalSpace(bone);
-            local->Scale.X = factor;
-            local->Scale.Y = factor;
-            local->Scale.Z = factor;
+            // 大きさは代入する (体の骨はアニメの大きさが 1。掛けると毎フレーム積み重なるおそれがある)
+            if (factor != 1f)
+            {
+                local->Scale.X = factor;
+                local->Scale.Y = factor;
+                local->Scale.Z = factor;
+            }
+
+            // 子の位置は親のふくらみの分だけ伸ばす (Havok は親の大きさを子の位置に掛けないため)。
+            // アニメが毎フレーム局所の位置を書き直すので、掛け算しても積み重ならない
+            if (move != 1f)
+            {
+                local->Translation.X *= move;
+                local->Translation.Y *= move;
+                local->Translation.Z *= move;
+            }
         }
     }
 

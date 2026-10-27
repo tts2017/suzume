@@ -36,4 +36,22 @@ public static class PuffScale
 
         return factors;
     }
+
+    /// <summary>
+    /// 各ボーンの局所の位置に掛ける倍率。ゲームの骨格 (Havok) は親の大きさを子の位置に掛けないので、
+    /// そのままだと体だけがふくらみ、翼や頭は元の位置に残って体に埋まる。子の位置を親のふくらみの分だけ伸ばす。
+    /// </summary>
+    public static float[] TranslationFactors(IReadOnlyList<string?> names, IReadOnlyList<int> parents, float amount)
+    {
+        var factors = new float[names.Count];
+        for (var bone = 0; bone < names.Count; bone++)
+        {
+            var parent = parents[bone];
+            // 脚の付け根は動かさない (動かすと足が地面にめり込む。付け根は ふくらんだ体に隠れて、脚が短く見える)
+            var leg = names[bone]?.StartsWith("j_asi_", StringComparison.Ordinal) == true;
+            factors[bone] = parent >= 0 && !leg ? Target(names[parent], amount) : 1f;
+        }
+
+        return factors;
+    }
 }
