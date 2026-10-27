@@ -47,6 +47,7 @@ BUFF = greyish((186, 156, 116))        # 脇腹・羽の縁
 TAIL_COLOR = greyish((92, 68, 48))     # 尾
 VENT = greyish((180, 164, 142))        # 尾の下 (淡い灰茶色)
 WING_UNDER = greyish((176, 162, 146))  # 翼の裏
+FRINGE = (228, 223, 210)               # 翼の羽の白い縁取り
 
 
 def load(folder):
@@ -143,6 +144,7 @@ def regions(maps, original):
     paint(flight & (edge < 0.5), DARK)
     paint(flight & (edge >= 0.5) & (edge < 0.8), BROWN)
     paint(flight & (edge >= 0.8), BUFF)
+    paint(flight & (edge >= 0.9), FRINGE)      # 羽の感じを出す白い縁取り
     # 前縁 (z が大きい側) から少し後ろ、付け根側だけに白い帯 (中雨覆の先) と淡い帯 (大雨覆の先)
     paint(top & (z > 0.025) & (z < 0.030) & (x < 0.075), WHITE)
     paint(top & (z > 0.012) & (z < 0.0155) & (x < 0.07), BUFF)
