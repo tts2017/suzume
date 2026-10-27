@@ -36,7 +36,6 @@ WHITE = (236, 233, 224)      # ほっぺ・襟・翼の帯
 BELLY = (208, 202, 190)      # 胸・腹 (灰色がかった白)
 BUFF = (186, 156, 116)       # 脇腹・羽の縁
 TAIL_COLOR = (92, 68, 48)    # 尾
-RUMP = (128, 102, 78)        # 腰 (縦じまのない灰色がかった茶色)
 VENT = (180, 164, 142)       # 尾の下 (淡い灰茶色)
 WING_UNDER = (176, 162, 146) # 翼の裏
 
@@ -78,7 +77,7 @@ def regions(maps, original):
     body = (bone == SEBO) | (bone == KOSI)
     head = bone == KUBI
 
-    # 体: 腹 → 尾の下 → 腰 → 背中 (縦じま) → 首の白い襟 → のどの黒
+    # 体: 腹 → 尾の下 → 背中 (縦じまの羽模様、肩から尾の付け根まで) → 首の白い襟 → のどの黒
     # 茶色い背中の範囲は、元の絵が茶色に塗った所に合わせる (上を向いた面だけにすると、後ろの下半分が白くなる)
     paint(body, BELLY)
     paint(body & (np.abs(maps[..., 4]) > 0.8), np.add(BELLY, BUFF) / 2)  # 脇腹はうっすら黄土色
@@ -87,9 +86,7 @@ def regions(maps, original):
     # 羽毛の細かい濃淡でまだらにならないよう、赤みを大きくぼかしてから分ける (体の外は混ぜない)
     redness = (original[..., 0] - original[..., 2]) * body
     redness = blur(redness, 6) / np.maximum(blur(body.astype(np.float32), 6), 1e-3)
-    upper = body & (redness > 50)
-    paint(upper, RUMP)
-    back = upper & (ny > 0.25) & (z > -0.04) & (z < 0.04)
+    back = body & (redness > 50)
     paint(back, BROWN)
     # 背中の黒い縦じま: 体の前後に流れる筋を、むらで途切れさせる
     wobble = blur(np.random.default_rng(7).standard_normal((SIZE, SIZE)).astype(np.float32), 2) * 6.0
