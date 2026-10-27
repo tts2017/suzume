@@ -86,6 +86,13 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var wanderDistance = config.WanderDistance;
+        if (ImGui.SliderFloat(Text.WanderDistance, ref wanderDistance, 1f, 10f))
+        {
+            config.WanderDistance = wanderDistance;
+            changed = true;
+        }
+
         var headOffset = config.HeadOffset;
         if (ImGui.SliderFloat(Text.HeadOffset, ref headOffset, -1f, 1f))
         {

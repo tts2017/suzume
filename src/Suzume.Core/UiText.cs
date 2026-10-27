@@ -11,6 +11,7 @@ public sealed class UiText
     public required string Volume { get; init; }
     public required string ChirpFrequency { get; init; }
     public required string FlyDistance { get; init; }
+    public required string WanderDistance { get; init; }
     public required string HeadOffset { get; init; }
     public required string Puffed { get; init; }
     public required string PuffAmount { get; init; }
@@ -57,6 +58,7 @@ public sealed class UiText
         Volume = "音量",
         ChirpFrequency = "鳴く頻度",
         FlyDistance = "飛ぶ距離 (yalm)",
+        WanderDistance = "あなたから離れて動き回る距離 (yalm)",
         HeadOffset = "頭の高さの補正 (yalm)",
         Puffed = "ふくら雀 (羽毛をふくらませた丸い形)",
         PuffAmount = "ふくらみ (%)",
@@ -99,6 +101,7 @@ public sealed class UiText
         Volume = "Volume",
         ChirpFrequency = "Call frequency",
         FlyDistance = "Fly distance (yalms)",
+        WanderDistance = "How far it roams from you (yalms)",
         HeadOffset = "Head height adjustment (yalms)",
         Puffed = "Puffed up (round, fluffed winter feathers)",
         PuffAmount = "Puffiness (%)",
@@ -141,6 +144,7 @@ public sealed class UiText
         Volume = "Lautstärke",
         ChirpFrequency = "Ruf-Häufigkeit",
         FlyDistance = "Flugdistanz (Yalm)",
+        WanderDistance = "Wie weit er sich von dir entfernt (Yalm)",
         HeadOffset = "Kopfhöhe anpassen (Yalm)",
         Puffed = "Aufgeplustert (rund, mit aufgestelltem Winterfederkleid)",
         PuffAmount = "Aufplusterung (%)",
@@ -183,6 +187,7 @@ public sealed class UiText
         Volume = "Volume",
         ChirpFrequency = "Fréquence des cris",
         FlyDistance = "Distance de vol (yalms)",
+        WanderDistance = "Distance à laquelle il s'éloigne de vous (yalms)",
         HeadOffset = "Ajustement de la hauteur de la tête (yalms)",
         Puffed = "Ébouriffé (rond, plumage d'hiver gonflé)",
         PuffAmount = "Gonflement (%)",

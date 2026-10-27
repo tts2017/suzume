@@ -37,7 +37,7 @@ A [Dalamud](https://github.com/goatcorp/Dalamud) plugin that makes the FINAL FAN
 | `/suzume dust` | 次に落ち着いたら砂浴びをする |
 | `/suzume preen` | 次に落ち着いたら毛づくろいをする |
 
-設定画面では、鳴き声のオンオフ・音量・鳴く頻度・向きによる聞こえ方、飛び始める距離、頭に乗るときの高さの補正、ふくら雀とふくらみ具合を変えられます。鳴き声は設定画面の「試聴」ボタンで確かめられます。
+設定画面では、鳴き声のオンオフ・音量・鳴く頻度・向きによる聞こえ方、飛び始める距離、あなたから離れて動き回る距離、頭に乗るときの高さの補正、ふくら雀とふくらみ具合を変えられます。鳴き声は設定画面の「試聴」ボタンで確かめられます。
 
 ### インストール
 
@@ -98,7 +98,7 @@ FINAL FANTASY XIV は株式会社スクウェア・エニックスの登録商�
 | `/suzume dust` | Take a dust bath once it settles down |
 | `/suzume preen` | Preen once it settles down |
 
-The settings cover calls on/off, volume, call frequency, directional calls, the distance at which it flies, a head height adjustment for perching, and puffing up and how much. The Preview buttons play each call.
+The settings cover calls on/off, volume, call frequency, directional calls, the distance at which it flies, how far it roams from you, a head height adjustment for perching, and puffing up and how much. The Preview buttons play each call.
 
 ### Installation
 

@@ -95,6 +95,7 @@ public sealed unsafe class SparrowAgent
             target.Y = targetGround;
 
         parameters.FlyDistance = config.FlyDistance;
+        parameters.WanderRadiusMax = config.WanderDistance;
         parameters.ChirpFrequency = config.ChirpFrequency;
 
         var head = HeadPosition(player, ownerPosition);

@@ -16,6 +16,8 @@ public sealed class Configuration : IPluginConfiguration
     public bool StereoSound { get; set; } = true;
     public float ChirpFrequency { get; set; } = 1.0f;
     public float FlyDistance { get; set; } = 6f;
+    // 止まっているあなたの周りを、最大でこれだけ離れて動き回る (yalm)
+    public float WanderDistance { get; set; } = 2.5f;
     // 頭に乗るときの高さの補正 (yalm)。キャラクターの身長に合わせて調整する
     public float HeadOffset { get; set; }
     // ふくら雀: 冬のスズメのように羽毛をふくらませた丸い形にする
@@ -29,6 +31,7 @@ public sealed class Configuration : IPluginConfiguration
         Volume = Math.Clamp(Volume, 0f, 1f);
         ChirpFrequency = Math.Clamp(ChirpFrequency, 0f, 3f);
         FlyDistance = Math.Clamp(FlyDistance, 2f, 20f);
+        WanderDistance = Math.Clamp(WanderDistance, 1f, 10f);
         HeadOffset = Math.Clamp(HeadOffset, -1f, 1f);
         PuffAmount = Math.Clamp(PuffAmount, 0.05f, 0.3f);
     }

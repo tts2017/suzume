@@ -56,6 +56,19 @@ public class SparrowWanderPerchTests
     }
 
     [Fact]
+    public void WandersFartherWhenAllowedFarther()
+    {
+        var p = new SparrowParams { WanderRadiusMax = 6f, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
+        var brain = new SparrowBrain(p, new SeededRandom(1));
+
+        var poses = Run(brain, _ => Input(), 90f);
+
+        var distances = poses.Select(x => Angles.HorizontalDistance(x.Position, Player)).ToList();
+        Assert.True(distances.Max() > 4f, $"最も離れたのが {distances.Max()}");
+        Assert.All(distances, d => Assert.True(d <= p.WanderRadiusMax + p.HopDistanceMax, $"プレイヤーから {d}"));
+    }
+
+    [Fact]
     public void PerchesOnHeadWhenBeckoned()
     {
         var p = new SparrowParams { WanderDelay = float.PositiveInfinity, DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
