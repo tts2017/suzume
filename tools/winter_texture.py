@@ -133,11 +133,11 @@ def regions(maps, original):
     paint(under, WING_UNDER)
     darkness = np.clip((105.0 - original_luma) / 45.0, 0.0, 1.0)[..., None]
     color[top] = (np.array(BROWN) * (1 - darkness) + np.array(DARK) * darkness)[top]
-    # 前縁から後ろの羽 (風切羽・三列風切): 付け根から先へ並ぶ細長い羽。1 枚ごとに黒い芯・茶色・淡い縁が、
-    # 羽の向き (後ろへ行くほど少し外へ流れる斜め) に筋になる。付け根側の三列風切は幅が広い
-    width = np.where(x < 0.06, 0.02, 0.015)
+    # 前縁から後ろの羽 (風切羽): 翼の付け根から先へ伸びる細長い羽が、前後に重なって並ぶ。
+    # 1 枚ごとに黒い芯・茶色・淡い縁が付け根から先への筋になる (たたむと体の前後に流れる)。先の方ほど少し後ろへ流す
+    width = 0.009
     sway = blur(np.random.default_rng(11).standard_normal((SIZE, SIZE)).astype(np.float32), 3) * 0.08
-    across = np.mod((x + 0.15 * (0.04 - z)) / width + sway, 1.0)
+    across = np.mod((z + 0.12 * (x - 0.03)) / width + sway, 1.0)
     edge = np.abs(across - 0.5) * 2.0          # 0 が羽の芯、1 が縁
     flight = top & (z < 0.024)
     paint(flight & (edge < 0.5), DARK)
