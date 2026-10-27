@@ -148,8 +148,18 @@ public sealed class SparrowBrain
                 break;
         }
 
+        SnapToGround();
         yaw = Angles.Wrap(yaw);
         return CurrentPose();
+    }
+
+    /// <summary>地上で止まっている間は、足元の地面の高さに合わせる(段差などでずれを残さない)。</summary>
+    private void SnapToGround()
+    {
+        var grounded = state is SparrowState.Idle or SparrowState.Forage or SparrowState.Preen or SparrowState.DustBath
+            || (state is SparrowState.Hop or SparrowState.Alarm && hop == null);
+        if (grounded && groundAt?.Invoke(position) is { } ground)
+            position.Y = ground;
     }
 
     private SparrowPose CurrentPose() =>
@@ -445,6 +455,18 @@ public sealed class SparrowBrain
             to.Y = position.Y + Math.Clamp((goal.Y - position.Y) * share, -p.MaxHopRise, p.MaxHopRise);
         }
 
+        // 着地点の地面が分かれば、その高さに降りる。1 回で越えられない段差は飛んで越える
+        if (groundAt?.Invoke(to) is { } landing)
+        {
+            if (MathF.Abs(landing - position.Y) > p.MaxHopRise)
+            {
+                EnterTakeOff(input);
+                return;
+            }
+
+            to.Y = landing;
+        }
+
         // 向きはホップの前に一瞬で変える。跳んでいる間は変えない
         if (Angles.HorizontalDistance(position, to) > Epsilon)
             yaw = Angles.YawTowards(position, to);
@@ -647,7 +669,9 @@ public sealed class SparrowBrain
     {
         altitude += p.TakeOffClimbSpeed * dt;
         MoveTowards(goal, p.FlySpeed * 0.5f * dt, dt);
+        AvoidTerrain(dt);
         position.Y = groundY + altitude;
+        KeepAboveGround(0f);
         if (stateTime < p.TakeOffDuration)
             return;
 
@@ -687,7 +711,9 @@ public sealed class SparrowBrain
         }
 
         MoveTowards(goal, speed * dt, dt);
+        AvoidTerrain(dt);
         position.Y = groundY + altitude;
+        KeepAboveGround(p.FlightClearance);
 
         // プレイヤーが速く動いている間は降りずに付いていく。地面の高さが目標に追いつくまでと、
         // 滑空の高さまで下りきるまでは降りない(真上から急降下しない)
@@ -722,7 +748,11 @@ public sealed class SparrowBrain
 
         altitude = landStartAltitude * (1f - settled);
         MoveTowards(goal, landStartSpeed * (1f - u) * dt, dt);
+        // 降りる場所の実際の地面へ近づける
+        if (groundAt?.Invoke(position) is { } under)
+            groundY = MoveToward(groundY, under, p.GroundFollowSpeed * dt);
         position.Y = groundY + altitude;
+        KeepAboveGround(0f);
 
         if (u >= 1f)
         {
@@ -730,6 +760,32 @@ public sealed class SparrowBrain
             EnterIdle(afterLanding: true);
         }
     }
+
+    /// <summary>真下と少し先の地形が基準の地面より高ければ、基準を持ち上げて越える。</summary>
+    private void AvoidTerrain(float dt)
+    {
+        if (groundAt == null)
+            return;
+
+        // 先を見るのは行き先まで(行き先より奥の地形で基準が上がり、降りられなくならないように)
+        var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
+        var lookAhead = MathF.Min(p.TerrainLookAhead, Angles.HorizontalDistance(position, goal));
+        var terrain = MathF.Max(
+            groundAt(position) ?? float.MinValue,
+            groundAt(position + forward * lookAhead) ?? float.MinValue);
+        if (terrain > groundY)
+            groundY = MoveToward(groundY, terrain, p.TerrainClimbSpeed * dt);
+    }
+
+    /// <summary>真下の地面より clearance 以上、上にいるようにする(地面に埋まらない)。</summary>
+    private void KeepAboveGround(float clearance)
+    {
+        if (groundAt?.Invoke(position) is { } under && position.Y < under + clearance)
+            position.Y = under + clearance;
+    }
+
+    private static float MoveToward(float from, float to, float maxStep) =>
+        from + Math.Clamp(to - from, -maxStep, maxStep);
 
     /// <summary>
     /// 水平に step だけ進む。地面の高さの基準も、進んだ割合だけ目標へ近づける(一度に動く量は GroundFollowSpeed まで)。

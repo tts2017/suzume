@@ -65,6 +65,70 @@ public class SparrowGroundTests
             $"高さ {landed.Position.Y:F2}、地面 {Slope(landed.Position):F2}");
     }
 
+    // 3 < X < 6 に高さ 1.5 の台がある平地
+    private static float? Mound(Vector3 at) => at.X is > 3f and < 6f ? 1.5f : 0f;
+
+    // X > 1 から高さ 0.3 の段差
+    private static float? Step(Vector3 at) => at.X > 1f ? 0.3f : 0f;
+
+    private static List<SparrowPose> RunTo(SparrowBrain brain, Vector3 target, Vector3 player, float seconds)
+    {
+        var poses = new List<SparrowPose>();
+        for (var i = 0; i < (int)MathF.Round(seconds / Dt); i++)
+            poses.Add(brain.Tick(new SparrowInput(Dt, target, 0f, player, Vector3.Zero, false)));
+        return poses;
+    }
+
+    private static SparrowParams Calm() => new()
+    {
+        WanderDelay = float.PositiveInfinity,
+        DustBathIntervalMin = float.PositiveInfinity,
+        DustBathIntervalMax = float.PositiveInfinity,
+    };
+
+    [Fact]
+    public void FliesOverMoundWithoutSinkingIntoIt()
+    {
+        var brain = new SparrowBrain(Calm(), new SeededRandom(1), Mound);
+        brain.Tick(new SparrowInput(Dt, Vector3.Zero, 0f, new Vector3(0f, 0f, -3f), Vector3.Zero, false));
+        var target = new Vector3(10f, 0f, 0f);
+
+        var poses = RunTo(brain, target, target + new Vector3(0f, 0f, -3f), 8f);
+
+        Assert.Contains(poses, x => x.State == SparrowState.Fly);
+        Assert.All(poses, x => Assert.True(x.Position.Y >= Mound(x.Position)!.Value - 0.01f,
+            $"x={x.Position.X:F2} の高さ {x.Position.Y:F2} が地面 {Mound(x.Position)} の下 ({x.State})"));
+        Assert.Equal(0f, poses[^1].Position.Y, 2);
+    }
+
+    [Fact]
+    public void LandsOnTopOfRaisedGround()
+    {
+        var brain = new SparrowBrain(Calm(), new SeededRandom(1), Mound);
+        brain.Tick(new SparrowInput(Dt, Vector3.Zero, 0f, new Vector3(0f, 0f, -3f), Vector3.Zero, false));
+        var target = new Vector3(4.5f, 1.5f, 0f);
+
+        var poses = RunTo(brain, target, target + new Vector3(0f, 0f, -0.5f), 8f);
+
+        Assert.All(poses, x => Assert.True(x.Position.Y >= Mound(x.Position)!.Value - 0.01f,
+            $"x={x.Position.X:F2} の高さ {x.Position.Y:F2} が地面 {Mound(x.Position)} の下 ({x.State})"));
+        Assert.Equal(1.5f, poses[^1].Position.Y, 2);
+    }
+
+    [Fact]
+    public void StaysOnStepAfterWandering()
+    {
+        var p = new SparrowParams { DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
+        var brain = new SparrowBrain(p, new SeededRandom(1), Step);
+
+        var poses = RunTo(brain, new Vector3(0.9f, 0f, -1.1f), Vector3.Zero, 40f);
+
+        var grounded = poses.Where(x => x.State is SparrowState.Idle or SparrowState.Forage or SparrowState.Preen).ToList();
+        Assert.Contains(grounded, x => x.Position.X > 1.2f); // 段差の上にも行く
+        Assert.All(grounded, x => Assert.True(MathF.Abs(x.Position.Y - Step(x.Position)!.Value) < 0.02f,
+            $"x={x.Position.X:F2} の高さ {x.Position.Y:F2}、地面 {Step(x.Position)}"));
+    }
+
     [Fact]
     public void FallsBackToTargetHeightWhenGroundUnknown()
     {

@@ -88,6 +88,10 @@ public sealed class SparrowParams
     public float LandPlayerSpeed { get; set; } = 3f;
     // 飛行中に地面の高さの基準を目標へ合わせる速さ (yalm/秒)
     public float GroundFollowSpeed { get; set; } = 3f;
+    // 飛行中は真下と少し先の地形を見て、地面からこの高さ以上を保つ
+    public float FlightClearance { get; set; } = 0.3f;
+    public float TerrainLookAhead { get; set; } = 1.5f;
+    public float TerrainClimbSpeed { get; set; } = 6f;
     // 着地前の滑空: プレイヤーが止まり、この距離まで来たら羽ばたきをやめて下り坂で近づく
     public float ApproachDistance { get; set; } = 4f;
     // 滑空の下り坂 (目標までの水平距離 1y あたりの高さ)
