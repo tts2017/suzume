@@ -123,6 +123,35 @@ public sealed unsafe class SparrowController : IDisposable
             applier.Release(minion);
     }
 
+    /// <summary>制御が動かないときの調査用。止めている条件を並べる。</summary>
+    public string Diagnose()
+    {
+        var reasons = new List<string>();
+        if (!config.Enabled)
+            reasons.Add("設定で無効");
+        if (Plugin.ClientState.IsGPosing)
+            reasons.Add("GPose");
+        foreach (var flag in SuspendFlags)
+        {
+            if (Plugin.Condition[flag])
+                reasons.Add(flag.ToString());
+        }
+
+        return $"Active={Active} 停止理由=[{string.Join(", ", reasons)}] 連続エラー={consecutiveErrors}";
+    }
+
+    private static readonly ConditionFlag[] SuspendFlags =
+    [
+        ConditionFlag.BetweenAreas,
+        ConditionFlag.BetweenAreas51,
+        ConditionFlag.OccupiedInCutSceneEvent,
+        ConditionFlag.WatchingCutscene,
+        ConditionFlag.WatchingCutscene78,
+        ConditionFlag.InFlight,
+        ConditionFlag.Swimming,
+        ConditionFlag.Diving,
+    ];
+
     // 地面の高さが分からない(飛行・水中)ときと、演出中はゲーム本来の動きに任せる
     private static bool IsSuspendedByGame() =>
         Plugin.ClientState.IsGPosing

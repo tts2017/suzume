@@ -116,6 +116,7 @@ public sealed class Plugin : IDalamudPlugin
                 ChatGui.Print($"[Suzume] probe = {parts[1]} {id}");
                 return;
             default:
+                ChatGui.Print($"[Suzume] probe={probe.Mode} {controller.Diagnose()}");
                 ChatGui.Print($"[Suzume] {probe.Describe()}");
                 return;
         }
