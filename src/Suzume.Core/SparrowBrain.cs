@@ -22,6 +22,7 @@ public sealed class SparrowBrain
     private float yaw;
     private float pitch;
     private float roll;
+    private float wingAngle;
     // 見た目だけ沈める深さ(砂浴びの腹ばい)。position そのものは地面のまま
     private float crouch;
     private SparrowState state;
@@ -49,6 +50,7 @@ public sealed class SparrowBrain
     private float dustPhaseLeft;
     private bool shaking;
     private float shakeTime;
+    private float dustBaseYaw;
 
     // Forage / Preen
     private int pecks;
@@ -163,7 +165,7 @@ public sealed class SparrowBrain
     }
 
     private SparrowPose CurrentPose() =>
-        new(position - new Vector3(0f, crouch, 0f), yaw, pitch, anim, state, triggers, roll);
+        new(position - new Vector3(0f, crouch, 0f), yaw, pitch, anim, state, triggers, roll, wingAngle);
 
     private void Reset(in SparrowInput input)
     {
@@ -188,6 +190,7 @@ public sealed class SparrowBrain
         stateTime = 0f;
         roll = 0f;
         crouch = 0f;
+        wingAngle = 0f;
     }
 
     // ---- 動き回る・頭に乗る ----
@@ -590,6 +593,7 @@ public sealed class SparrowBrain
         dustBathArmed = false;
         dustBathRequested = false;
         SetState(SparrowState.DustBath);
+        dustBaseYaw = yaw;
         stateDuration = rng.Range(p.DustBathDurationMin, p.DustBathDurationMax);
         shaking = false;
         StartDustPhase(fluttering: true);
@@ -627,6 +631,8 @@ public sealed class SparrowBrain
             anim = SparrowAnim.Idle;
             crouch = 0f;
             pitch = 0f;
+            wingAngle = 0f;
+            yaw = dustBaseYaw;
             return;
         }
 
@@ -634,19 +640,24 @@ public sealed class SparrowBrain
         if (dustPhaseLeft <= 0f)
             StartDustPhase(!dustFluttering);
 
-        // 腹ばいになり、ばたつきの間は羽をばたつかせて体を左右に揺する
+        // 腹を地面に付けたまま (止まり姿勢)、ばたつきの間は翼を高速でばたつかせ、体を地面に擦りつける
+        anim = SparrowAnim.Idle;
         crouch = p.DustCrouch;
         if (dustFluttering)
         {
-            anim = SparrowAnim.Flutter;
-            pitch = Angles.DegToRad(p.DustPitchDeg);
-            roll = Angles.DegToRad(p.DustRollDeg) * MathF.Sin(MathF.Tau * p.DustRollHz * stateTime);
+            var t = stateTime;
+            wingAngle = Angles.DegToRad(p.DustWingSpreadDeg)
+                + Angles.DegToRad(p.DustWingBeatDeg) * MathF.Sin(MathF.Tau * p.DustWingBeatHz * t);
+            pitch = Angles.DegToRad(p.DustPitchDeg) + Angles.DegToRad(p.DustRockPitchDeg) * MathF.Sin(MathF.Tau * p.DustRockHz * t);
+            roll = Angles.DegToRad(p.DustRollDeg) * MathF.Sin(MathF.Tau * p.DustRollHz * t);
+            yaw = dustBaseYaw + Angles.DegToRad(p.DustShimmyYawDeg) * MathF.Sin(MathF.Tau * p.DustShimmyHz * t);
         }
         else
         {
-            anim = SparrowAnim.Idle;
+            wingAngle = 0f;
             pitch = Angles.DegToRad(p.DustPitchDeg) * 0.5f;
             roll = 0f;
+            yaw = dustBaseYaw;
         }
     }
 

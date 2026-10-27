@@ -29,7 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ChirpPlayer? chirpPlayer;
     private readonly SparrowController controller;
     private readonly ProbeRunner probe = new();
-    private readonly WingProbe wingProbe = new();
+    private readonly BonePoser bonePoser = new();
 
     public Plugin()
     {
@@ -45,7 +45,7 @@ public sealed class Plugin : IDalamudPlugin
             Log.Error(ex, "鳴き声の初期化に失敗しました。音なしで動作します");
         }
 
-        controller = new SparrowController(config, chirpPlayer);
+        controller = new SparrowController(config, chirpPlayer, bonePoser);
         configWindow = new ConfigWindow(config, DescribeState, kind => chirpPlayer?.Play(kind, config.Volume), controller.ResetPosition);
         windowSystem.AddWindow(configWindow);
         PluginInterface.UiBuilder.Draw += OnDraw;
@@ -62,7 +62,6 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnUpdate(IFramework framework)
     {
-        wingProbe.OnUpdate((float)framework.UpdateDelta.TotalSeconds);
         // 確認コマンドの実行中は、通常の制御を止める
         if (Probing)
         {
@@ -76,7 +75,6 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnDraw()
     {
-        wingProbe.OnDraw();
         if (Probing)
             probe.OnDraw();
         else
@@ -115,10 +113,6 @@ public sealed class Plugin : IDalamudPlugin
                 config.Save();
                 ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
                 return;
-            case "wing" when parts.Length >= 2:
-                wingProbe.Mode = parts[1];
-                ChatGui.Print($"[Suzume] wing = {parts[1]}");
-                return;
             case "reset":
                 controller.ResetPosition();
                 ChatGui.Print("[Suzume] スズメをそばの地面に置き直しました");
@@ -148,8 +142,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= configWindow.Toggle;
         windowSystem.RemoveAllWindows();
         probe.Release();
-        wingProbe.Dispose();
         controller.Dispose();
+        bonePoser.Dispose();
         chirpPlayer?.Dispose();
     }
 }

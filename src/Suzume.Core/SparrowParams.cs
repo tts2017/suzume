@@ -59,10 +59,19 @@ public sealed class SparrowParams
     public float DustPauseMin { get; set; } = 0.3f;
     public float DustPauseMax { get; set; } = 0.8f;
     // 腹ばいで沈む深さ (yalm)、前傾、左右の揺れ
-    public float DustCrouch { get; set; } = 0.03f;
+    public float DustCrouch { get; set; } = 0.045f;
     public float DustPitchDeg { get; set; } = 20f;
     public float DustRollDeg { get; set; } = 15f;
     public float DustRollHz { get; set; } = 6f;
+    // 体を地面に擦る: 前後のゆすりと向きの小刻みな振り
+    public float DustRockPitchDeg { get; set; } = 8f;
+    public float DustRockHz { get; set; } = 3f;
+    public float DustShimmyYawDeg { get; set; } = 10f;
+    public float DustShimmyHz { get; set; } = 2f;
+    // 翼: 少し開いて高速でばたつかせる
+    public float DustWingSpreadDeg { get; set; } = 30f;
+    public float DustWingBeatDeg { get; set; } = 25f;
+    public float DustWingBeatHz { get; set; } = 12f;
     // 終わりに体を振るう
     public float ShakeDuration { get; set; } = 0.3f;
     public float ShakeRollDeg { get; set; } = 20f;
