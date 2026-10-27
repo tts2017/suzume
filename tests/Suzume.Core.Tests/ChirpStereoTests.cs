@@ -65,6 +65,17 @@ public class ChirpStereoTests
         Assert.Equal(level, above);
     }
 
+    [Theory]
+    [InlineData(0f, -5f, 0f)]
+    [InlineData(5f, 0f, 0f)]
+    [InlineData(5f, 5f, 0.7071f)]
+    [InlineData(0f, 5f, 1f)]
+    public void BehindGrowsTowardsTheBack(float x, float z, float expected)
+    {
+        var p = ChirpStereo.Place(Listener, North, Listener + new Vector3(x, 0f, z));
+        Assert.Equal(expected, p.Behind, 3);
+    }
+
     [Fact]
     public void RightOnTopOfTheListenerIsCentred()
     {

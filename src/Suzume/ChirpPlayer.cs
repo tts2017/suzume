@@ -34,7 +34,7 @@ public sealed class ChirpPlayer : IDisposable
 
         var variants = clips[kind];
         var clip = variants[random.Next(variants.Length)];
-        mixer.AddMixerInput(new StereoClipSampleProvider(clip, volume, placement));
+        mixer.AddMixerInput(new StereoClipSampleProvider(ChirpMuffler.Apply(clip, placement.Behind), volume, placement));
     }
 
     public void Dispose()

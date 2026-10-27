@@ -120,7 +120,7 @@ public sealed unsafe class SparrowAgent
         LastPose = pose;
         LastTarget = target;
 
-        // 鳴き声の大きさは、あなたからの距離で決める。左右は、あなたの位置でカメラの向きに耳を向けたときの聞こえ方
+        // 鳴き声の大きさは、あなたからの距離で決める。左右と前後(後ろはこもる)は、あなたの位置でカメラの向きに耳を向けたときの聞こえ方
         var chirp = scheduler.Update(dt, pose.State, pose.Triggers);
         if (chirp is { } kind && config.SoundEnabled && chirpPlayer != null)
         {
@@ -185,7 +185,7 @@ public sealed unsafe class SparrowAgent
         var side = !onScreen ? "画面外"
             : sparrowScreen.X > playerScreen.X ? $"右 {sparrowScreen.X - playerScreen.X:F0}px"
             : $"左 {playerScreen.X - sparrowScreen.X:F0}px";
-        Plugin.Log.Debug($"鳴き声の定位: 音量 左 {placement.LeftGain:F2} 右 {placement.RightGain:F2} 遅れ 左 {placement.LeftDelaySamples} 右 {placement.RightDelaySamples} / 画面ではあなたの{side}");
+        Plugin.Log.Debug($"鳴き声の定位: 音量 左 {placement.LeftGain:F2} 右 {placement.RightGain:F2} 遅れ 左 {placement.LeftDelaySamples} 右 {placement.RightDelaySamples} 後ろ {placement.Behind:F2} / 画面ではあなたの{side}");
     }
 
     private static bool IsTargeted(Companion* minion)

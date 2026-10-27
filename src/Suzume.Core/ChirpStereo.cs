@@ -2,13 +2,13 @@ using System.Numerics;
 
 namespace Suzume.Core;
 
-/// <summary>左右の耳それぞれの音量と遅れ (サンプル数)。</summary>
-public readonly record struct StereoPlacement(float LeftGain, float RightGain, int LeftDelaySamples, int RightDelaySamples)
+/// <summary>左右の耳それぞれの音量と遅れ (サンプル数)、後ろからの度合い (0 で前か横、1 で真後ろ)。</summary>
+public readonly record struct StereoPlacement(float LeftGain, float RightGain, int LeftDelaySamples, int RightDelaySamples, float Behind)
 {
-    public static readonly StereoPlacement Centre = new(1f, 1f, 0, 0);
+    public static readonly StereoPlacement Centre = new(1f, 1f, 0, 0, 0f);
 }
 
-/// <summary>聞き手から見た鳴き声の向きで、左右の音量差と時間差 (位相差) を決める。</summary>
+/// <summary>聞き手から見た鳴き声の向きで、左右の音量差と時間差 (位相差)、後ろからのこもり具合を決める。</summary>
 public static class ChirpStereo
 {
     // 真横でも反対の耳から少し聞こえるよう、遠い側の耳を最大でこれだけ下げる
@@ -27,12 +27,14 @@ public static class ChirpStereo
             return StereoPlacement.Centre;
 
         // FFXIV の座標では、forward を向いたときの右手は (-forward.Z, 0, forward.X)
+        var direction = Vector3.Normalize(toSource);
         var right = Vector3.Normalize(new Vector3(-facing.Z, 0f, facing.X));
-        var side = Vector3.Dot(Vector3.Normalize(toSource), right);
+        var side = Vector3.Dot(direction, right);
+        var behind = MathF.Max(0f, -Vector3.Dot(direction, Vector3.Normalize(facing)));
         var farGain = 1f - MaxPan * MathF.Abs(side);
         var farDelay = (int)MathF.Round(MaxDelaySamples * MathF.Abs(side));
         return side >= 0f
-            ? new StereoPlacement(farGain, 1f, farDelay, 0)
-            : new StereoPlacement(1f, farGain, 0, farDelay);
+            ? new StereoPlacement(farGain, 1f, farDelay, 0, behind)
+            : new StereoPlacement(1f, farGain, 0, farDelay, behind);
     }
 }

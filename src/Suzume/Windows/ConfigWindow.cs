@@ -52,7 +52,7 @@ public sealed class ConfigWindow : Window
         }
 
         var stereo = config.StereoSound;
-        if (ImGui.Checkbox("鳴き声を左右に定位 (スズメのいる向きから聞こえる)", ref stereo))
+        if (ImGui.Checkbox("鳴き声を定位 (スズメのいる向きから聞こえる。後ろはこもる)", ref stereo))
         {
             config.StereoSound = stereo;
             changed = true;
