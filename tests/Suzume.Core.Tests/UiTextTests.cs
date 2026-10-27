@@ -9,16 +9,23 @@ public class UiTextTests
     public void JapaneseSettingShowsJapanese() =>
         Assert.Same(UiText.Japanese, UiText.For("ja"));
 
+    [Fact]
+    public void GermanSettingShowsGerman() =>
+        Assert.Same(UiText.German, UiText.For("de"));
+
+    [Fact]
+    public void FrenchSettingShowsFrench() =>
+        Assert.Same(UiText.French, UiText.For("fr"));
+
     [Theory]
     [InlineData("en")]
-    [InlineData("de")]
-    [InlineData("fr")]
+    [InlineData("ko")]
     [InlineData("")]
     [InlineData(null)]
     public void OtherSettingsShowEnglish(string? language) =>
         Assert.Same(UiText.English, UiText.For(language));
 
-    public static TheoryData<string> Languages => ["ja", "en"];
+    public static TheoryData<string> Languages => ["ja", "en", "de", "fr"];
 
     [Theory]
     [MemberData(nameof(Languages))]
@@ -31,11 +38,15 @@ public class UiTextTests
             Assert.NotEqual(kind.ToString(), text.ChirpLabel(kind));
     }
 
-    [Fact]
-    public void EnglishHasNoJapaneseLeftOver()
+    public static TheoryData<string> LatinLanguages => ["en", "de", "fr"];
+
+    [Theory]
+    [MemberData(nameof(LatinLanguages))]
+    public void HasNoJapaneseLeftOver(string language)
     {
-        var texts = StringProperties().Select(p => (string)p.GetValue(UiText.English)!)
-            .Concat(Enum.GetValues<ChirpKind>().Select(UiText.English.ChirpLabel));
+        var text = UiText.For(language);
+        var texts = StringProperties().Select(p => (string)p.GetValue(text)!)
+            .Concat(Enum.GetValues<ChirpKind>().Select(text.ChirpLabel));
         Assert.All(texts, s => Assert.DoesNotContain(s, c => c is >= '぀' and <= 'ヿ' or >= '一' and <= '鿿'));
     }
 
@@ -44,6 +55,17 @@ public class UiTextTests
     {
         foreach (var property in StringProperties())
             Assert.NotEqual(property.GetValue(UiText.English), property.GetValue(UiText.Japanese));
+    }
+
+    [Theory]
+    [InlineData("de")]
+    [InlineData("fr")]
+    public void IsTranslatedFromEnglish(string language)
+    {
+        var text = UiText.For(language);
+        // タイトルや "Volume" のように同じ綴りの語もあるので、大半が違えばよい
+        var same = StringProperties().Count(p => Equals(p.GetValue(text), p.GetValue(UiText.English)));
+        Assert.True(same <= 3, $"{same} 個が英語のまま");
     }
 
     private static IEnumerable<PropertyInfo> StringProperties() =>

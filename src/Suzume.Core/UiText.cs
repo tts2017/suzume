@@ -1,6 +1,6 @@
 namespace Suzume.Core;
 
-/// <summary>設定画面とチャットに出す文言。Dalamud の言語設定が日本語なら日本語、それ以外は英語。</summary>
+/// <summary>設定画面とチャットに出す文言。Dalamud の言語設定が日本語・ドイツ語・フランス語ならその言語、それ以外は英語。</summary>
 public sealed class UiText
 {
     public required string WindowTitle { get; init; }
@@ -39,8 +39,13 @@ public sealed class UiText
         ChirpLabels.TryGetValue(kind, out var label) ? label : kind.ToString();
 
     /// <summary>Dalamud の言語コード ("ja", "en" など) に合う文言。</summary>
-    public static UiText For(string? language) =>
-        language == "ja" ? Japanese : English;
+    public static UiText For(string? language) => language switch
+    {
+        "ja" => Japanese,
+        "de" => German,
+        "fr" => French,
+        _ => English,
+    };
 
     public static readonly UiText Japanese = new()
     {
@@ -123,6 +128,90 @@ public sealed class UiText
             [ChirpKind.Alarm] = "Churr",
             [ChirpKind.Flight] = "Chirrup",
             [ChirpKind.Dust] = "Flutter",
+        },
+    };
+
+    public static readonly UiText German = new()
+    {
+        WindowTitle = "Suzume",
+        Enabled = "Aktiviert",
+        IncludeOthers = "Auch auf Spatzen anderer Spieler anwenden",
+        Sound = "Rufe",
+        StereoSound = "Räumliche Rufe (aus der Richtung des Spatzen; von hinten gedämpft)",
+        Volume = "Lautstärke",
+        ChirpFrequency = "Ruf-Häufigkeit",
+        FlyDistance = "Flugdistanz (Yalm)",
+        HeadOffset = "Kopfhöhe anpassen (Yalm)",
+        Puffed = "Aufgeplustert (rund, mit aufgestelltem Winterfederkleid)",
+        PuffAmount = "Aufplusterung (%)",
+        BeckonHint = "Mit /beckon hüpft er auf deinen Kopf, mit erneutem /beckon wieder herunter",
+        ScareHint = "Er fliegt davon, wenn du ihm gegenüber /angry /furious /slap /battlestance /box /stomp /throw verwendest",
+        ResetPosition = "Spatz wieder neben dich setzen",
+        Preview = "Probehören",
+        ShowDebug = "Debug-Infos anzeigen",
+        CommandHelp = "Öffnet die Einstellungen. /suzume on|off zum Umschalten. /suzume reset setzt ihn neben dich. /suzume dust für ein Sandbad, /suzume preen zum Gefiederputzen. /suzume probe <Modus> [id] und /suzume info dienen der Fehlersuche.",
+        TurnedOn = "Aktiviert",
+        TurnedOff = "Deaktiviert",
+        ResetDone = "Der Spatz wurde neben dir auf den Boden gesetzt",
+        PreenQueued = "Er putzt sein Gefieder, sobald er zur Ruhe kommt",
+        DustQueued = "Er nimmt ein Sandbad, sobald er zur Ruhe kommt",
+        DisabledAfterErrors = "Nach wiederholten Fehlern deaktiviert. Siehe /xllog.",
+        DebugStopped = "Angehalten",
+        DebugActiveCount = "Gesteuerte Spatzen",
+        DebugState = "Zustand",
+        DebugAnim = "Anim",
+        DebugPosition = "Angezeigt bei",
+        DebugTarget = "Ziel",
+        DebugGap = "Abstand",
+        ChirpLabels = new Dictionary<ChirpKind, string>
+        {
+            [ChirpKind.Contact] = "Tschilp",
+            [ChirpKind.Song] = "Tschilp-tschilp",
+            [ChirpKind.Alarm] = "Tscherr",
+            [ChirpKind.Flight] = "Tschirrip",
+            [ChirpKind.Dust] = "Flatter",
+        },
+    };
+
+    public static readonly UiText French = new()
+    {
+        WindowTitle = "Suzume",
+        Enabled = "Activé",
+        IncludeOthers = "Appliquer aussi aux moineaux des autres joueurs",
+        Sound = "Cris",
+        StereoSound = "Cris spatialisés (entendus depuis la position du moineau ; étouffés par-derrière)",
+        Volume = "Volume",
+        ChirpFrequency = "Fréquence des cris",
+        FlyDistance = "Distance de vol (yalms)",
+        HeadOffset = "Ajustement de la hauteur de la tête (yalms)",
+        Puffed = "Ébouriffé (rond, plumage d'hiver gonflé)",
+        PuffAmount = "Gonflement (%)",
+        BeckonHint = "Avec /beckon, il saute sur votre tête ; refaites /beckon pour qu'il descende",
+        ScareHint = "Il s'envole si vous faites /angry /furious /slap /battlestance /box /stomp /throw dans sa direction",
+        ResetPosition = "Replacer le moineau à côté de vous",
+        Preview = "Écouter",
+        ShowDebug = "Afficher le débogage",
+        CommandHelp = "Ouvre les paramètres. /suzume on|off pour activer ou désactiver. /suzume reset pour le replacer. /suzume dust pour un bain de poussière, /suzume preen pour qu'il se lisse les plumes. /suzume probe <mode> [id] et /suzume info servent au débogage.",
+        TurnedOn = "Activé",
+        TurnedOff = "Désactivé",
+        ResetDone = "Le moineau a été replacé au sol à côté de vous",
+        PreenQueued = "Il se lissera les plumes dès qu'il sera calme",
+        DustQueued = "Il prendra un bain de poussière dès qu'il sera calme",
+        DisabledAfterErrors = "Désactivé après des erreurs répétées. Consultez /xllog.",
+        DebugStopped = "Arrêté",
+        DebugActiveCount = "Moineaux contrôlés",
+        DebugState = "État",
+        DebugAnim = "Anim",
+        DebugPosition = "Affiché à",
+        DebugTarget = "Cible",
+        DebugGap = "Écart",
+        ChirpLabels = new Dictionary<ChirpKind, string>
+        {
+            [ChirpKind.Contact] = "Piou",
+            [ChirpKind.Song] = "Piou-piou",
+            [ChirpKind.Alarm] = "Tchrr",
+            [ChirpKind.Flight] = "Tchirrip",
+            [ChirpKind.Dust] = "Frou-frou",
         },
     };
 }
