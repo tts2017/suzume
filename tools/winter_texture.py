@@ -28,16 +28,25 @@ LEGS = (6, 7, 8, 9)
 WING_INNER, WING_OUTER = (10, 13), (11, 12)
 
 # 日本のスズメの冬羽の色 (sRGB)
-CHESTNUT = (120, 86, 66)     # 頭のてっぺん・後頭部 (写真の、灰色がかった くすんだ茶色)
-BROWN = (136, 92, 54)        # 背中・翼
-DARK = (44, 32, 24)          # 背中の縦じま・羽の芯
-BLACK = (24, 21, 20)         # のど・ほっぺの斑点・くちばしの付け根
-WHITE = (236, 233, 224)      # ほっぺ・襟・翼の帯
-BELLY = (208, 202, 190)      # 胸・腹 (灰色がかった白)
-BUFF = (186, 156, 116)       # 脇腹・羽の縁
-TAIL_COLOR = (92, 68, 48)    # 尾
-VENT = (180, 164, 142)       # 尾の下 (淡い灰茶色)
-WING_UNDER = (176, 162, 146) # 翼の裏
+# 茶色の部分は灰色に寄せる (GREY_MIX の割合だけ、同じ明るさの灰色を混ぜる)
+GREY_MIX = 0.45
+
+
+def greyish(rgb, mix=GREY_MIX):
+    grey = sum(rgb) / 3
+    return tuple(round(c * (1 - mix) + grey * mix) for c in rgb)
+
+
+CHESTNUT = greyish((120, 86, 66))      # 頭のてっぺん・後頭部
+BROWN = greyish((136, 92, 54))         # 背中・翼
+DARK = greyish((44, 32, 24))           # 背中の縦じま・羽の芯
+BLACK = (24, 21, 20)                   # のど・ほっぺの斑点・くちばしの付け根
+WHITE = (236, 233, 224)                # ほっぺ・襟・翼の帯
+BELLY = (208, 202, 190)                # 胸・腹 (灰色がかった白)
+BUFF = greyish((186, 156, 116))        # 脇腹・羽の縁
+TAIL_COLOR = greyish((92, 68, 48))     # 尾
+VENT = greyish((180, 164, 142))        # 尾の下 (淡い灰茶色)
+WING_UNDER = greyish((176, 162, 146))  # 翼の裏
 
 
 def load(folder):
