@@ -20,6 +20,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICondition Condition { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
+    [PluginService] internal static IGameInteropProvider Interop { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private readonly Configuration config;
@@ -28,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ChirpPlayer? chirpPlayer;
     private readonly SparrowController controller;
     private readonly ProbeRunner probe = new();
+    private readonly WingProbe wingProbe = new();
 
     public Plugin()
     {
@@ -60,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnUpdate(IFramework framework)
     {
+        wingProbe.OnUpdate((float)framework.UpdateDelta.TotalSeconds);
         // 確認コマンドの実行中は、通常の制御を止める
         if (Probing)
         {
@@ -73,6 +76,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnDraw()
     {
+        wingProbe.OnDraw();
         if (Probing)
             probe.OnDraw();
         else
@@ -111,6 +115,10 @@ public sealed class Plugin : IDalamudPlugin
                 config.Save();
                 ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
                 return;
+            case "wing" when parts.Length >= 2:
+                wingProbe.Mode = parts[1];
+                ChatGui.Print($"[Suzume] wing = {parts[1]}");
+                return;
             case "reset":
                 controller.ResetPosition();
                 ChatGui.Print("[Suzume] スズメをそばの地面に置き直しました");
@@ -140,6 +148,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= configWindow.Toggle;
         windowSystem.RemoveAllWindows();
         probe.Release();
+        wingProbe.Dispose();
         controller.Dispose();
         chirpPlayer?.Dispose();
     }
