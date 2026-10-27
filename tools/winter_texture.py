@@ -36,6 +36,8 @@ WHITE = (236, 233, 224)      # ほっぺ・襟・翼の帯
 BELLY = (208, 202, 190)      # 胸・腹 (灰色がかった白)
 BUFF = (186, 156, 116)       # 脇腹・羽の縁
 TAIL_COLOR = (92, 68, 48)    # 尾
+RUMP = (128, 102, 78)        # 腰 (縦じまのない灰色がかった茶色)
+VENT = (180, 164, 142)       # 尾の下 (淡い灰茶色)
 WING_UNDER = (176, 162, 146) # 翼の裏
 
 
@@ -62,8 +64,9 @@ def blur(image, radius):
     return out
 
 
-def regions(maps, original_luma):
-    """画素ごとの部位を、色 (float RGB 0〜255) と「元のまま残す」マスクにする"""
+def regions(maps, original):
+    """画素ごとの部位を、色 (float RGB 0〜255) と「元のまま残す」マスクにする。original は元の絵 (float RGB)"""
+    original_luma = original.mean(axis=2)
     bone = maps[..., 0].astype(int)
     x, y, z = np.abs(maps[..., 1]), maps[..., 2], maps[..., 3]
     ny = maps[..., 5]
@@ -75,10 +78,18 @@ def regions(maps, original_luma):
     body = (bone == SEBO) | (bone == KOSI)
     head = bone == KUBI
 
-    # 体: 腹 → 背中 (縦じま) → 首の白い襟 → のどの黒
+    # 体: 腹 → 尾の下 → 腰 → 背中 (縦じま) → 首の白い襟 → のどの黒
+    # 茶色い背中の範囲は、元の絵が茶色に塗った所に合わせる (上を向いた面だけにすると、後ろの下半分が白くなる)
     paint(body, BELLY)
     paint(body & (np.abs(maps[..., 4]) > 0.8), np.add(BELLY, BUFF) / 2)  # 脇腹はうっすら黄土色
-    back = body & (ny > 0.25) & (z < 0.04)
+    paint(body & (z < -0.035) & (ny < 0.1), VENT)
+    # 茶色は赤みが強い (R - B が大きい)。クリーム色の腹は影でも赤みが弱い
+    # 羽毛の細かい濃淡でまだらにならないよう、赤みを大きくぼかしてから分ける (体の外は混ぜない)
+    redness = (original[..., 0] - original[..., 2]) * body
+    redness = blur(redness, 6) / np.maximum(blur(body.astype(np.float32), 6), 1e-3)
+    upper = body & (redness > 50)
+    paint(upper, RUMP)
+    back = upper & (ny > 0.25) & (z > -0.04) & (z < 0.04)
     paint(back, BROWN)
     # 背中の黒い縦じま: 体の前後に流れる筋を、むらで途切れさせる
     wobble = blur(np.random.default_rng(7).standard_normal((SIZE, SIZE)).astype(np.float32), 2) * 6.0
@@ -123,7 +134,7 @@ def regions(maps, original_luma):
 
 def winter_diffuse(maps, original_bgra):
     original = original_bgra[..., [2, 1, 0]].astype(np.float32)
-    color, keep, bone = regions(maps, original.mean(axis=2))
+    color, keep, bone = regions(maps, original)
     luma = original.mean(axis=2) / 255.0
 
     # 部位の境目を少しぼかしてから、元の羽毛の細かい濃淡を重ねる
