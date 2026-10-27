@@ -24,6 +24,9 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
 
+    /// <summary>Dalamud の言語設定に合う文言。</summary>
+    internal static UiText Text => UiText.For(PluginInterface.UiLanguage);
+
     private readonly Configuration config;
     private readonly WindowSystem windowSystem = new("Suzume");
     private readonly ConfigWindow configWindow;
@@ -53,10 +56,21 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += configWindow.Toggle;
         PluginInterface.UiBuilder.OpenMainUi += configWindow.Toggle;
         Framework.Update += OnUpdate;
+        AddCommand();
+        PluginInterface.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void AddCommand() =>
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume reset で置き直し。/suzume dust で砂浴び、/suzume preen で毛づくろい。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
+            HelpMessage = Text.CommandHelp,
         });
+
+    // コマンドの説明文を新しい言語で登録し直す
+    private void OnLanguageChanged(string language)
+    {
+        CommandManager.RemoveHandler(CommandName);
+        AddCommand();
     }
 
     private bool Probing => probe.Mode != ProbeRunner.Off;
@@ -87,15 +101,15 @@ public sealed class Plugin : IDalamudPlugin
     private string DescribeState()
     {
         if (!controller.Active)
-            return $"停止中\n{probe.Describe()}";
+            return $"{Text.DebugStopped}\n{probe.Describe()}";
 
         var pose = controller.LastPose;
         var gap = Angles.HorizontalDistance(pose.Position, controller.LastTarget);
-        return $"動かしている数: {controller.ActiveCount}\n"
-            + $"状態: {pose.State} / アニメ: {pose.Anim}\n"
-            + $"見た目の位置: {pose.Position:F2}\n"
-            + $"目標地点: {controller.LastTarget:F2}\n"
-            + $"差: {gap:F2} y";
+        return $"{Text.DebugActiveCount}: {controller.ActiveCount}\n"
+            + $"{Text.DebugState}: {pose.State} / {Text.DebugAnim}: {pose.Anim}\n"
+            + $"{Text.DebugPosition}: {pose.Position:F2}\n"
+            + $"{Text.DebugTarget}: {controller.LastTarget:F2}\n"
+            + $"{Text.DebugGap}: {gap:F2} y";
     }
 
     private void HandleCommand(string args)
@@ -113,19 +127,19 @@ public sealed class Plugin : IDalamudPlugin
             case "off":
                 config.Enabled = parts[0] == "on";
                 config.Save();
-                ChatGui.Print($"[Suzume] {(config.Enabled ? "有効" : "無効")}にしました");
+                ChatGui.Print($"[Suzume] {(config.Enabled ? Text.TurnedOn : Text.TurnedOff)}");
                 return;
             case "reset":
                 controller.ResetPosition();
-                ChatGui.Print("[Suzume] スズメをそばの地面に置き直しました");
+                ChatGui.Print($"[Suzume] {Text.ResetDone}");
                 return;
             case "preen":
                 controller.RequestPreen();
-                ChatGui.Print("[Suzume] 次に落ち着いたら毛づくろいします");
+                ChatGui.Print($"[Suzume] {Text.PreenQueued}");
                 return;
             case "dust":
                 controller.RequestDustBath();
-                ChatGui.Print("[Suzume] 次に落ち着いたら砂浴びします");
+                ChatGui.Print($"[Suzume] {Text.DustQueued}");
                 return;
             case "probe" when parts.Length >= 2:
                 var id = parts.Length >= 3 && ushort.TryParse(parts[2], out var value) ? value : (ushort)0;
@@ -142,6 +156,7 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         CommandManager.RemoveHandler(CommandName);
+        PluginInterface.LanguageChanged -= OnLanguageChanged;
         Framework.Update -= OnUpdate;
         PluginInterface.UiBuilder.Draw -= OnDraw;
         PluginInterface.UiBuilder.OpenConfigUi -= configWindow.Toggle;

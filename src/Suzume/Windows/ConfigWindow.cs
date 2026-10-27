@@ -7,13 +7,16 @@ namespace Suzume.Windows;
 
 public sealed class ConfigWindow : Window
 {
+    // 言語が変わってもウィンドウの位置と大きさを引き継ぐための ID
+    private const string WindowId = "###SuzumeConfig";
+
     private readonly Configuration config;
     private readonly Func<string> debugText;
     private readonly Action<ChirpKind> preview;
     private readonly Action resetPosition;
 
     public ConfigWindow(Configuration config, Func<string> debugText, Action<ChirpKind> preview, Action resetPosition)
-        : base("タビスズメ###SuzumeConfig")
+        : base($"{Plugin.Text.WindowTitle}{WindowId}")
     {
         this.config = config;
         this.debugText = debugText;
@@ -26,68 +29,72 @@ public sealed class ConfigWindow : Window
         };
     }
 
+    private static UiText Text => Plugin.Text;
+
+    public override void PreDraw() => WindowName = $"{Text.WindowTitle}{WindowId}";
+
     public override void Draw()
     {
         var changed = false;
 
         var enabled = config.Enabled;
-        if (ImGui.Checkbox("有効", ref enabled))
+        if (ImGui.Checkbox(Text.Enabled, ref enabled))
         {
             config.Enabled = enabled;
             changed = true;
         }
 
         var includeOthers = config.IncludeOthers;
-        if (ImGui.Checkbox("他の人のタビスズメにも適用", ref includeOthers))
+        if (ImGui.Checkbox(Text.IncludeOthers, ref includeOthers))
         {
             config.IncludeOthers = includeOthers;
             changed = true;
         }
 
         var sound = config.SoundEnabled;
-        if (ImGui.Checkbox("鳴き声", ref sound))
+        if (ImGui.Checkbox(Text.Sound, ref sound))
         {
             config.SoundEnabled = sound;
             changed = true;
         }
 
         var stereo = config.StereoSound;
-        if (ImGui.Checkbox("鳴き声を定位 (スズメのいる向きから聞こえる。後ろはこもる)", ref stereo))
+        if (ImGui.Checkbox(Text.StereoSound, ref stereo))
         {
             config.StereoSound = stereo;
             changed = true;
         }
 
         var volume = config.Volume;
-        if (ImGui.SliderFloat("音量", ref volume, 0f, 1f))
+        if (ImGui.SliderFloat(Text.Volume, ref volume, 0f, 1f))
         {
             config.Volume = volume;
             changed = true;
         }
 
         var frequency = config.ChirpFrequency;
-        if (ImGui.SliderFloat("鳴く頻度", ref frequency, 0f, 3f))
+        if (ImGui.SliderFloat(Text.ChirpFrequency, ref frequency, 0f, 3f))
         {
             config.ChirpFrequency = frequency;
             changed = true;
         }
 
         var flyDistance = config.FlyDistance;
-        if (ImGui.SliderFloat("飛ぶ距離 (yalm)", ref flyDistance, 2f, 20f))
+        if (ImGui.SliderFloat(Text.FlyDistance, ref flyDistance, 2f, 20f))
         {
             config.FlyDistance = flyDistance;
             changed = true;
         }
 
         var headOffset = config.HeadOffset;
-        if (ImGui.SliderFloat("頭の高さの補正 (yalm)", ref headOffset, -1f, 1f))
+        if (ImGui.SliderFloat(Text.HeadOffset, ref headOffset, -1f, 1f))
         {
             config.HeadOffset = headOffset;
             changed = true;
         }
 
         var puffed = config.Puffed;
-        if (ImGui.Checkbox("ふくら雀 (羽毛をふくらませた丸い形)", ref puffed))
+        if (ImGui.Checkbox(Text.Puffed, ref puffed))
         {
             config.Puffed = puffed;
             changed = true;
@@ -96,30 +103,30 @@ public sealed class ConfigWindow : Window
         if (config.Puffed)
         {
             var puffAmount = config.PuffAmount * 100f;
-            if (ImGui.SliderFloat("ふくらみ (%)", ref puffAmount, 5f, 30f, "%.0f"))
+            if (ImGui.SliderFloat(Text.PuffAmount, ref puffAmount, 5f, 30f, "%.0f"))
             {
                 config.PuffAmount = puffAmount / 100f;
                 changed = true;
             }
         }
 
-        ImGui.TextDisabled("/beckon (手まねき) で頭に乗り、もう一度で下ります");
-        ImGui.TextDisabled("スズメに向けて /angry /furious /slap /battlestance /box /stomp /throw をすると逃げます");
+        ImGui.TextDisabled(Text.BeckonHint);
+        ImGui.TextDisabled(Text.ScareHint);
 
-        if (ImGui.Button("スズメをそばに置き直す"))
+        if (ImGui.Button(Text.ResetPosition))
             resetPosition();
 
         ImGui.Separator();
-        ImGui.TextUnformatted("試聴");
+        ImGui.TextUnformatted(Text.Preview);
         foreach (var kind in Enum.GetValues<ChirpKind>())
         {
             ImGui.SameLine();
-            if (ImGui.Button(Label(kind)))
+            if (ImGui.Button(Text.ChirpLabel(kind)))
                 preview(kind);
         }
 
         var showDebug = config.ShowDebug;
-        if (ImGui.Checkbox("デバッグ表示", ref showDebug))
+        if (ImGui.Checkbox(Text.ShowDebug, ref showDebug))
         {
             config.ShowDebug = showDebug;
             changed = true;
@@ -134,14 +141,4 @@ public sealed class ConfigWindow : Window
             config.Save();
         }
     }
-
-    private static string Label(ChirpKind kind) => kind switch
-    {
-        ChirpKind.Contact => "チュン",
-        ChirpKind.Song => "チュンチュン",
-        ChirpKind.Alarm => "ジュクジュク",
-        ChirpKind.Flight => "チュリリ",
-        ChirpKind.Dust => "バサバサ",
-        _ => kind.ToString(),
-    };
 }

@@ -59,7 +59,7 @@ public sealed unsafe class SparrowController : IDisposable
                 config.Enabled = false;
                 config.Save();
                 consecutiveErrors = 0;
-                Plugin.ChatGui.PrintError("[Suzume] エラーが続いたため無効にしました。/xllog を確認してください。");
+                Plugin.ChatGui.PrintError($"[Suzume] {Plugin.Text.DisabledAfterErrors}");
             }
         }
     }
