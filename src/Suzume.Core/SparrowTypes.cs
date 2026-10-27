@@ -75,6 +75,11 @@ public readonly record struct SparrowInput(
 /// <param name="Roll">左右の傾き(ラジアン)</param>
 /// <param name="WingSpread">翼を体の外側へ開く角度(ラジアン)。0 ならアニメのまま</param>
 /// <param name="WingFlap">開いた翼を上下に振る角度(ラジアン、正で上)</param>
+/// <param name="WingSide">翼を動かす側。0 は両方、負は左だけ、正は右だけ</param>
+/// <param name="NeckYaw">首を上下の軸まわりにひねる角度(ラジアン、正で +X 側)</param>
+/// <param name="NeckPitch">首を下げる角度(ラジアン、正で下)</param>
+/// <param name="NeckRoll">首をかしげる角度(ラジアン)</param>
+/// <param name="TailLift">尾を上げる角度(ラジアン、正で上)</param>
 public readonly record struct SparrowPose(
     Vector3 Position,
     float Yaw,
@@ -84,4 +89,9 @@ public readonly record struct SparrowPose(
     SparrowTrigger Triggers,
     float Roll = 0f,
     float WingSpread = 0f,
-    float WingFlap = 0f);
+    float WingFlap = 0f,
+    float WingSide = 0f,
+    float NeckYaw = 0f,
+    float NeckPitch = 0f,
+    float NeckRoll = 0f,
+    float TailLift = 0f);

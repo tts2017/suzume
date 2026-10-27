@@ -38,6 +38,27 @@ public sealed class SparrowBrain
     private float shownPitch;
     private float shownRoll;
     private float shownSpread;
+    private float wingSide;
+    private float shownWingSide;
+
+    // 首と尾 (ボーン): 首は目標へなめらかに、つつく上下動はあとから上乗せする
+    private float neckYawTarget;
+    private float neckPitchTarget;
+    private float neckNibble;
+    private float shownNeckYaw;
+    private float shownNeckPitch;
+    private float shownNeckRoll;
+    private float headTilt;
+    private float headTiltHold;
+    private float tailLift;
+    private float tailFlickAmplitude;
+    private float tailFlickDuration;
+    private float tailFlickTime = float.MaxValue;
+
+    // 毛づくろい
+    private float preenSide;
+    private bool preenWing;
+    private float preenSwitchAt;
     // 見た目だけ沈める深さ(砂浴びの腹ばい)。position そのものは地面のまま
     private float crouch;
     private SparrowState state;
@@ -60,6 +81,7 @@ public sealed class SparrowBrain
     // DustBath
     private bool dustBathArmed;
     private bool dustBathRequested;
+    private bool preenRequested;
     private float dustBathCountdown;
     private bool dustFluttering;
     private float dustPhaseLeft;
@@ -69,7 +91,6 @@ public sealed class SparrowBrain
 
     // Forage / Preen
     private int pecks;
-    private float preenBaseYaw;
 
     // TakeOff / Fly / Land
     private bool flapping;
@@ -109,6 +130,9 @@ public sealed class SparrowBrain
 
     /// <summary>次に地上で落ち着いたとき、すぐに砂浴びを始める(確認用)。</summary>
     public void RequestDustBath() => dustBathRequested = true;
+
+    /// <summary>次に地上で落ち着いたとき、すぐに毛づくろいを始める(確認用)。</summary>
+    public void RequestPreen() => preenRequested = true;
 
     public SparrowPose Tick(in SparrowInput input)
     {
@@ -168,8 +192,39 @@ public sealed class SparrowBrain
         SnapToGround();
         AdvanceTurn(dt);
         yaw = Angles.Wrap(yaw);
+        UpdateGestures(dt);
         SmoothPresentation(dt);
         return CurrentPose();
+    }
+
+    // ---- 首・尾のしぐさ ----
+
+    /// <summary>首をかしげる時間・尾の跳ね上げを進め、毛づくろい以外では首を正面に戻す。</summary>
+    private void UpdateGestures(float dt)
+    {
+        if (state != SparrowState.Preen)
+        {
+            neckYawTarget = 0f;
+            neckPitchTarget = 0f;
+            // つつく上下動は、急に止めずに静かに収める
+            neckNibble = Approach(neckNibble, 0f, dt, p.NeckSmoothing * 0.5f);
+        }
+
+        headTiltHold -= dt;
+        if (headTiltHold <= 0f || state is SparrowState.TakeOff or SparrowState.Fly or SparrowState.Land or SparrowState.Preen)
+            headTilt = 0f;
+
+        tailFlickTime += dt;
+        tailLift = tailFlickTime < tailFlickDuration
+            ? tailFlickAmplitude * MathF.Sin(MathF.PI * tailFlickTime / tailFlickDuration)
+            : 0f;
+    }
+
+    private void FlickTail(float degrees, float duration)
+    {
+        tailFlickAmplitude = Angles.DegToRad(degrees);
+        tailFlickDuration = duration;
+        tailFlickTime = 0f;
     }
 
     // ---- なめらかな向き変え ----
@@ -215,12 +270,28 @@ public sealed class SparrowBrain
             CancelTurn();
     }
 
-    /// <summary>前傾・傾き・翼の開きの急な切り替えを、短い時間でなめらかにつなぐ。</summary>
+    /// <summary>前傾・傾き・翼の開き・首の急な切り替えを、短い時間でなめらかにつなぐ。</summary>
     private void SmoothPresentation(float dt)
     {
         shownPitch = Approach(shownPitch, pitch, dt, p.PitchSmoothing);
         shownRoll = Approach(shownRoll, roll, dt, p.RollSmoothing);
         shownSpread = Approach(shownSpread, wingSpread, dt, p.WingSpreadSmoothing);
+        // 翼を開いている側は、閉じ切るまで覚えておく(閉じる途中で反対の翼が動かないように)
+        if (wingSpread > 0f)
+            shownWingSide = wingSide;
+        else if (shownSpread == 0f)
+            shownWingSide = 0f;
+
+        var maxNeckStep = Angles.DegToRad(p.NeckMaxRateDeg) * dt;
+        shownNeckYaw = ApproachLimited(shownNeckYaw, neckYawTarget, dt, p.NeckSmoothing, maxNeckStep);
+        shownNeckPitch = ApproachLimited(shownNeckPitch, neckPitchTarget, dt, p.NeckSmoothing, maxNeckStep);
+        shownNeckRoll = ApproachLimited(shownNeckRoll, headTilt, dt, p.NeckSmoothing, maxNeckStep);
+    }
+
+    private static float ApproachLimited(float shown, float target, float dt, float smoothing, float maxStep)
+    {
+        var next = Approach(shown, target, dt, smoothing);
+        return shown + Math.Clamp(next - shown, -maxStep, maxStep);
     }
 
     private static float Approach(float shown, float target, float dt, float smoothing)
@@ -246,7 +317,8 @@ public sealed class SparrowBrain
     }
 
     private SparrowPose CurrentPose() =>
-        new(position + new Vector3(0f, turnLift - crouch, 0f), yaw, shownPitch, anim, state, triggers, shownRoll, shownSpread, ShownFlap());
+        new(position + new Vector3(0f, turnLift - crouch, 0f), yaw, shownPitch, anim, state, triggers, shownRoll, shownSpread, ShownFlap(),
+            shownWingSide, shownNeckYaw, shownNeckPitch + neckNibble, shownNeckRoll, tailLift);
 
     private void Reset(in SparrowInput input)
     {
@@ -257,6 +329,12 @@ public sealed class SparrowBrain
         shownPitch = 0f;
         shownRoll = 0f;
         shownSpread = 0f;
+        shownWingSide = 0f;
+        shownNeckYaw = 0f;
+        shownNeckPitch = 0f;
+        shownNeckRoll = 0f;
+        headTilt = 0f;
+        tailFlickTime = float.MaxValue;
         hop = null;
         alarmCooldown = 0f;
         perchIntent = false;
@@ -277,6 +355,7 @@ public sealed class SparrowBrain
         crouch = 0f;
         wingSpread = 0f;
         wingFlap = 0f;
+        wingSide = 0f;
     }
 
     // ---- 動き回る・頭に乗る ----
@@ -480,6 +559,8 @@ public sealed class SparrowBrain
         // 砂浴びの時間が来ていたら、渡り歩きの途中でもその場で始める
         if (dustBathRequested || (dustBathArmed && dustBathCountdown <= 0f))
             EnterDustBath();
+        else if (preenRequested)
+            EnterPreen();
         else if (NeedsToMove(input))
             EnterHop(input);
         else if (rng.Chance(p.ForageChance))
@@ -500,6 +581,13 @@ public sealed class SparrowBrain
         var sign = rng.Chance(0.5f) ? 1f : -1f;
         // 頭の上では跳ねない
         BeginTurn(yaw + sign * Angles.DegToRad(rng.Range(p.ScanAngleMinDeg, p.ScanAngleMaxDeg)), allowHop: state != SparrowState.Perched);
+
+        // 振り向いたあと、ときどき首をかしげてしばらく見つめる
+        if (rng.Chance(p.HeadTiltChance))
+        {
+            headTilt = (rng.Chance(0.5f) ? 1f : -1f) * Angles.DegToRad(rng.Range(p.HeadTiltMinDeg, p.HeadTiltMaxDeg));
+            headTiltHold = rng.Range(p.HeadTiltHoldMin, p.HeadTiltHoldMax);
+        }
         scanCountdown = rng.Range(p.ScanIntervalMin, p.ScanIntervalMax);
     }
 
@@ -577,6 +665,7 @@ public sealed class SparrowBrain
             position = current.To;
             hop = null;
             hopsLeft--;
+            FlickTail(p.HopTailFlickDeg, p.HopTailFlickDuration);
             hopGapLeft = rng.Range(p.HopGapMin, p.HopGapMax);
             return;
         }
@@ -631,10 +720,14 @@ public sealed class SparrowBrain
 
     private void EnterPreen()
     {
+        preenRequested = false;
         SetState(SparrowState.Preen);
         CancelTurn();
         stateDuration = rng.Range(p.PreenDurationMin, p.PreenDurationMax);
-        preenBaseYaw = yaw;
+        preenSide = rng.Chance(0.5f) ? 1f : -1f;
+        preenWing = rng.Chance(p.PreenWingChance);
+        // 背中の手入れでは、途中で反対側に替えることがある
+        preenSwitchAt = !preenWing && rng.Chance(p.PreenSwitchSideChance) ? stateDuration * 0.5f : float.MaxValue;
     }
 
     private void TickPreen(in SparrowInput input)
@@ -644,14 +737,35 @@ public sealed class SparrowBrain
 
         if (stateTime >= stateDuration)
         {
-            yaw = preenBaseYaw;
             EnterIdle();
             return;
         }
 
-        // 羽繕いの代用: 小刻みに体を揺らす(v2 でボーン操作に置き換える)
-        pitch = Angles.DegToRad(10f) * MathF.Sin(stateTime * MathF.Tau * 3f);
-        yaw = preenBaseYaw + 0.2f * MathF.Sin(stateTime * MathF.Tau * 1.5f);
+        if (stateTime >= preenSwitchAt)
+        {
+            preenSide = -preenSide;
+            preenSwitchAt = float.MaxValue;
+        }
+
+        // 首を後ろへひねり、くちばしで細かくつつく。体は手入れする側へ少し傾ける
+        neckNibble = Angles.DegToRad(p.PreenNibbleDeg) * MathF.Sin(MathF.Tau * p.PreenNibbleHz * stateTime);
+        pitch = 0f;
+        roll = preenSide * Angles.DegToRad(p.PreenBodyRollDeg);
+        if (preenWing)
+        {
+            // 翼の手入れ: その側の翼を持ち上げて開き、翼の内側へ首を深く入れる
+            neckYawTarget = preenSide * Angles.DegToRad(p.PreenWingNeckYawDeg);
+            neckPitchTarget = Angles.DegToRad(p.PreenWingNeckPitchDeg);
+            wingSpread = Angles.DegToRad(p.PreenWingLiftDeg);
+            wingFlap = 0f;
+            wingSide = preenSide;
+        }
+        else
+        {
+            neckYawTarget = preenSide * Angles.DegToRad(p.PreenBackNeckYawDeg);
+            neckPitchTarget = Angles.DegToRad(p.PreenBackNeckPitchDeg);
+            wingSpread = 0f;
+        }
     }
 
     // ---- DustBath ----
@@ -845,7 +959,10 @@ public sealed class SparrowBrain
             // 頭の上にはぴったり降りる(頭は歩いて動くことがある)
             position = Vector3.Lerp(landStartPosition, goal, settled);
             if (u >= 1f)
+            {
                 EnterPerched();
+                FlickTail(p.LandTailFlickDeg, p.LandTailFlickDuration);
+            }
             return;
         }
 
@@ -861,6 +978,7 @@ public sealed class SparrowBrain
         {
             returning = false;
             EnterIdle(afterLanding: true);
+            FlickTail(p.LandTailFlickDeg, p.LandTailFlickDuration);
         }
     }
 

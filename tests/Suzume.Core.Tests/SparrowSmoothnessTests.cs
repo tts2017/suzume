@@ -24,6 +24,17 @@ public class SparrowSmoothnessTests
                 $"向きが 1 フレームで {Angles.Wrap(next.Yaw - prev.Yaw) * 180f / MathF.PI:F1}° 変わった ({prev.State} -> {next.State})");
             Assert.True(MathF.Abs(next.Pitch - prev.Pitch) <= MaxTiltStep,
                 $"前傾が 1 フレームで {(next.Pitch - prev.Pitch) * 180f / MathF.PI:F1}° 変わった ({prev.State} -> {next.State})");
+            foreach (var (name, a, b) in new[]
+            {
+                ("首のひねり", prev.NeckYaw, next.NeckYaw),
+                ("首の下げ", prev.NeckPitch, next.NeckPitch),
+                ("首のかしげ", prev.NeckRoll, next.NeckRoll),
+                ("尾", prev.TailLift, next.TailLift),
+            })
+            {
+                Assert.True(MathF.Abs(b - a) <= MaxTiltStep, $"{name}が 1 フレームで {(b - a) * 180f / MathF.PI:F1}° 変わった ({prev.State} -> {next.State})");
+            }
+
             Assert.True(MathF.Abs(next.WingSpread - prev.WingSpread) <= MaxTiltStep,
                 $"翼の開きが 1 フレームで {(next.WingSpread - prev.WingSpread) * 180f / MathF.PI:F1}° 変わった ({prev.State} -> {next.State})");
         }
@@ -32,7 +43,7 @@ public class SparrowSmoothnessTests
     [Fact]
     public void NoWarpingTurnsWhileLivingAroundStillPlayer()
     {
-        var brain = new SparrowBrain(new SparrowParams { DustBathIntervalMin = 5f, DustBathIntervalMax = 10f }, new SeededRandom(1));
+        var brain = new SparrowBrain(new SparrowParams { DustBathIntervalMin = 5f, DustBathIntervalMax = 10f, PreenChance = 0.2f }, new SeededRandom(1));
         brain.Tick(Input());
 
         var poses = new List<SparrowPose>();

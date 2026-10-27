@@ -4,22 +4,28 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.Havok.Animation.Rig;
+using FFXIVClientStructs.Havok.Common.Base.Math.Quaternion;
+using FFXIVClientStructs.Havok.Common.Base.Math.Vector;
 using Suzume.Core;
 
 namespace Suzume;
 
 /// <summary>
-/// タビスズメのボーンを直接動かす。ゲームのアニメ更新 (Skeleton.UpdateAnimations) の直後に書き込む
+/// タビスズメのボーン (翼・首・尾) を直接動かす。ゲームのアニメ更新 (Skeleton.UpdateAnimations) の直後に書き込む
 /// (更新処理や描画直前で書いても、アニメに上書きされて描画に残らないことをスパイクで確認した)。
 /// </summary>
 public sealed unsafe class BonePoser : IDisposable
 {
-    // 左右の翼の付け根と、その先のボーン
-    private static readonly (string Root, string Tip)[] Wings = [("j_ude_a_l", "j_ude_b_l"), ("j_ude_a_r", "j_ude_b_r")];
+    private const string LeftWing = "j_ude_a_l";
+    private const string LeftWingTip = "j_ude_b_l";
+    private const string RightWing = "j_ude_a_r";
+    private const string RightWingTip = "j_ude_b_r";
+    private const string Neck = "j_kubi";
+    private const string Tail = "j_tail";
+    private static readonly string[] BoneNames = [LeftWing, LeftWingTip, RightWing, RightWingTip, Neck, Tail];
 
     private readonly Hook<Skeleton.Delegates.UpdateAnimations>? updateHook;
-    private readonly int[] rootIndex = [-1, -1];
-    private readonly int[] tipIndex = [-1, -1];
+    private readonly Dictionary<string, int> boneIndex = new();
     private hkaSkeleton* indexedSkeleton;
 
     public BonePoser()
@@ -27,7 +33,7 @@ public sealed unsafe class BonePoser : IDisposable
         var update = (nint)Skeleton.Addresses.UpdateAnimations.Value;
         if (update == 0)
         {
-            Plugin.Log.Warning("Skeleton.UpdateAnimations が見つからないため、翼は動かしません");
+            Plugin.Log.Warning("Skeleton.UpdateAnimations が見つからないため、ボーンは動かしません");
             return;
         }
 
@@ -35,31 +41,33 @@ public sealed unsafe class BonePoser : IDisposable
         updateHook.Enable();
     }
 
-    /// <summary>翼を体の外側へ開く角度 (ラジアン)。0 ならアニメのまま。毎フレーム制御側が入れる。</summary>
-    public float WingSpread { get; set; }
+    /// <summary>毎フレーム制御側が入れる。すべて 0 ならアニメのまま。</summary>
+    public SparrowPose Pose { get; set; }
 
-    /// <summary>開いた翼を上下に振る角度 (ラジアン、正で上)。</summary>
-    public float WingFlap { get; set; }
+    public void Clear() => Pose = default;
+
+    private static bool HasBoneWork(in SparrowPose pose) =>
+        pose.WingSpread != 0f || pose.WingFlap != 0f || pose.NeckYaw != 0f || pose.NeckPitch != 0f || pose.NeckRoll != 0f || pose.TailLift != 0f;
 
     private void UpdateAnimationsDetour(Skeleton* first, float deltaTime)
     {
         updateHook!.Original(first, deltaTime);
-        if (WingSpread == 0f && WingFlap == 0f)
+        var pose = Pose;
+        if (!HasBoneWork(pose))
             return;
 
         try
         {
-            ApplyWings(WingSpread, WingFlap);
+            Apply(pose);
         }
         catch (Exception ex)
         {
-            WingSpread = 0f;
-            WingFlap = 0f;
-            Plugin.Log.Error(ex, "翼のボーンの書き込みに失敗しました");
+            Clear();
+            Plugin.Log.Error(ex, "ボーンの書き込みに失敗しました");
         }
     }
 
-    private void ApplyWings(float spread, float flap)
+    private void Apply(in SparrowPose sparrow)
     {
         var minion = MinionTracker.FindSparrow(out _);
         if (minion == null)
@@ -77,70 +85,80 @@ public sealed unsafe class BonePoser : IDisposable
         if (pose == null || pose->Skeleton == null)
             return;
 
-        IndexWings(pose->Skeleton);
+        IndexBones(pose->Skeleton);
 
-        // 先に両翼の新しい局所回転をアニメ計算後のモデル空間の形から求め、まとめて書き込む
+        // 先にアニメ計算後のモデル空間の形から新しい局所回転をすべて求め、あとでまとめて書き込む
         var model = pose->AccessSyncedPoseModelSpace();
-        var rotations = new Quaternion?[Wings.Length];
-        for (var i = 0; i < Wings.Length; i++)
-        {
-            var root = rootIndex[i];
-            var tip = tipIndex[i];
-            if (root < 0 || tip < 0)
-                continue;
+        var writes = new List<(int Bone, Quaternion Rotation)>(4);
 
-            var parent = pose->Skeleton->ParentIndices[root];
-            var parentRotation = parent >= 0 ? ToQuaternion(model->Data[parent].Rotation) : Quaternion.Identity;
-            var shoulder = ToVector(model->Data[root].Translation);
-            var toTip = Vector3.Subtract(ToVector(model->Data[tip].Translation), shoulder);
-            rotations[i] = WingPose.LocalRotation(parentRotation, ToQuaternion(model->Data[root].Rotation), shoulder, toTip, spread, flap);
+        if (sparrow.WingSpread != 0f || sparrow.WingFlap != 0f)
+        {
+            // WingSide: 0 は両方、負は左だけ、正は右だけ
+            if (sparrow.WingSide <= 0f)
+                AddWing(pose, model, LeftWing, LeftWingTip, sparrow, writes);
+            if (sparrow.WingSide >= 0f)
+                AddWing(pose, model, RightWing, RightWingTip, sparrow, writes);
         }
 
-        for (var i = 0; i < Wings.Length; i++)
-        {
-            if (rotations[i] is not { } rotation)
-                continue;
+        if ((sparrow.NeckYaw != 0f || sparrow.NeckPitch != 0f || sparrow.NeckRoll != 0f) && boneIndex.TryGetValue(Neck, out var neck))
+            writes.Add((neck, BoneTwist.LocalRotation(ParentRotation(pose, model, neck), Rotation(model, neck), sparrow.NeckYaw, sparrow.NeckPitch, sparrow.NeckRoll)));
 
-            var local = pose->AccessBoneLocalSpace(rootIndex[i]);
+        if (sparrow.TailLift != 0f && boneIndex.TryGetValue(Tail, out var tail))
+            writes.Add((tail, BoneTwist.LocalRotation(ParentRotation(pose, model, tail), Rotation(model, tail), 0f, sparrow.TailLift, 0f)));
+
+        foreach (var (bone, rotation) in writes)
+        {
+            var local = pose->AccessBoneLocalSpace(bone);
             local->Rotation.X = rotation.X;
             local->Rotation.Y = rotation.Y;
             local->Rotation.Z = rotation.Z;
             local->Rotation.W = rotation.W;
         }
 
-        // 書き換えた局所の回転から、翼の先を含めてモデル空間を計算し直す
+        // 書き換えた局所の回転から、子のボーン (翼の先・頭・尾の先) を含めてモデル空間を計算し直す
         pose->AccessSyncedPoseModelSpace();
     }
 
-    private static Quaternion ToQuaternion(FFXIVClientStructs.Havok.Common.Base.Math.Quaternion.hkQuaternionf q) => new(q.X, q.Y, q.Z, q.W);
+    private void AddWing(hkaPose* pose, FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model,
+        string root, string tip, in SparrowPose sparrow, List<(int Bone, Quaternion Rotation)> writes)
+    {
+        if (!boneIndex.TryGetValue(root, out var rootIndex) || !boneIndex.TryGetValue(tip, out var tipIndex))
+            return;
 
-    private static Vector3 ToVector(FFXIVClientStructs.Havok.Common.Base.Math.Vector.hkVector4f v) => new(v.X, v.Y, v.Z);
+        var shoulder = ToVector(model->Data[rootIndex].Translation);
+        var toTip = Vector3.Subtract(ToVector(model->Data[tipIndex].Translation), shoulder);
+        writes.Add((rootIndex, WingPose.LocalRotation(
+            ParentRotation(pose, model, rootIndex), Rotation(model, rootIndex), shoulder, toTip, sparrow.WingSpread, sparrow.WingFlap)));
+    }
 
-    private void IndexWings(hkaSkeleton* skeleton)
+    private static Quaternion ParentRotation(hkaPose* pose, FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model, int bone)
+    {
+        var parent = pose->Skeleton->ParentIndices[bone];
+        return parent >= 0 ? Rotation(model, parent) : Quaternion.Identity;
+    }
+
+    private static Quaternion Rotation(FFXIVClientStructs.Havok.Common.Base.Container.Array.hkArray<FFXIVClientStructs.Havok.Common.Base.Math.QsTransform.hkQsTransformf>* model, int bone) =>
+        ToQuaternion(model->Data[bone].Rotation);
+
+    private static Quaternion ToQuaternion(hkQuaternionf q) => new(q.X, q.Y, q.Z, q.W);
+
+    private static Vector3 ToVector(hkVector4f v) => new(v.X, v.Y, v.Z);
+
+    private void IndexBones(hkaSkeleton* skeleton)
     {
         if (skeleton == indexedSkeleton)
             return;
 
-        for (var i = 0; i < Wings.Length; i++)
-        {
-            rootIndex[i] = -1;
-            tipIndex[i] = -1;
-        }
-
+        boneIndex.Clear();
         for (var bone = 0; bone < skeleton->Bones.Length; bone++)
         {
             var name = skeleton->Bones[bone].Name.String;
-            for (var i = 0; i < Wings.Length; i++)
-            {
-                if (name == Wings[i].Root)
-                    rootIndex[i] = bone;
-                else if (name == Wings[i].Tip)
-                    tipIndex[i] = bone;
-            }
+            if (name != null && BoneNames.Contains(name))
+                boneIndex[name] = bone;
         }
 
         indexedSkeleton = skeleton;
-        Plugin.Log.Debug($"翼のボーン: 左 {rootIndex[0]}→{tipIndex[0]} 右 {rootIndex[1]}→{tipIndex[1]}");
+        Plugin.Log.Debug($"ボーン: {string.Join(", ", boneIndex.Select(x => $"{x.Key}={x.Value}"))}");
     }
 
     public void Dispose() => updateHook?.Dispose();

@@ -95,6 +95,9 @@ public sealed unsafe class SparrowController : IDisposable
     /// <summary>確認用: 次に地上で落ち着いたとき砂浴びを始めさせる。</summary>
     public void RequestDustBath() => brain.RequestDustBath();
 
+    /// <summary>確認用: 次に地上で落ち着いたとき毛づくろいを始めさせる。</summary>
+    public void RequestPreen() => brain.RequestPreen();
+
     /// <summary>上書きをやめ、次に有効になったとき目標地点から始め直す。</summary>
     public void Suspend()
     {
@@ -150,8 +153,7 @@ public sealed unsafe class SparrowController : IDisposable
         if (pose.State != LastPose.State)
             Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
         applier.Apply(minion, pose);
-        bonePoser.WingSpread = pose.WingSpread;
-        bonePoser.WingFlap = pose.WingFlap;
+        bonePoser.Pose = pose;
         LogHeights((GameObject*)minion, pose, playerPosition);
         Active = true;
         LastPose = pose;
@@ -228,8 +230,7 @@ public sealed unsafe class SparrowController : IDisposable
             return;
 
         Active = false;
-        bonePoser.WingSpread = 0f;
-        bonePoser.WingFlap = 0f;
+        bonePoser.Clear();
         var minion = MinionTracker.FindSparrow(out _);
         if (minion != null)
             applier.Release(minion);

@@ -54,7 +54,7 @@ public sealed class Plugin : IDalamudPlugin
         Framework.Update += OnUpdate;
         CommandManager.AddHandler(CommandName, new CommandInfo((_, args) => HandleCommand(args))
         {
-            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume reset で置き直し。/suzume dust で砂浴び。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
+            HelpMessage = "設定画面を開きます。/suzume on|off で切り替え。/suzume reset で置き直し。/suzume dust で砂浴び、/suzume preen で毛づくろい。/suzume probe <モード> [id] / /suzume info はデバッグ用です。",
         });
     }
 
@@ -116,6 +116,10 @@ public sealed class Plugin : IDalamudPlugin
             case "reset":
                 controller.ResetPosition();
                 ChatGui.Print("[Suzume] スズメをそばの地面に置き直しました");
+                return;
+            case "preen":
+                controller.RequestPreen();
+                ChatGui.Print("[Suzume] 次に落ち着いたら毛づくろいします");
                 return;
             case "dust":
                 controller.RequestDustBath();

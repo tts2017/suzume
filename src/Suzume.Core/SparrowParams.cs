@@ -52,6 +52,33 @@ public sealed class SparrowParams
     // これより遅ければプレイヤーは止まっているとみなす
     public float StillSpeed { get; set; } = 0.3f;
 
+    // 首をかしげる: キョロキョロのたびにこの確率で、首を左右どちらかにかしげてしばらく止める
+    public float HeadTiltChance { get; set; } = 0.5f;
+    public float HeadTiltMinDeg { get; set; } = 20f;
+    public float HeadTiltMaxDeg { get; set; } = 35f;
+    public float HeadTiltHoldMin { get; set; } = 0.4f;
+    public float HeadTiltHoldMax { get; set; } = 0.9f;
+    public float NeckSmoothing { get; set; } = 0.1f;
+    public float NeckMaxRateDeg { get; set; } = 600f;
+
+    // 尾を跳ね上げる: 飛行からの着地と、ホップの着地
+    public float LandTailFlickDeg { get; set; } = 35f;
+    public float LandTailFlickDuration { get; set; } = 0.25f;
+    public float HopTailFlickDeg { get; set; } = 12f;
+    public float HopTailFlickDuration { get; set; } = 0.15f;
+
+    // 毛づくろい: 背中か翼を選び、首を後ろへひねってくちばしでつつく
+    public float PreenWingChance { get; set; } = 0.5f;
+    public float PreenBackNeckYawDeg { get; set; } = 90f;
+    public float PreenBackNeckPitchDeg { get; set; } = 30f;
+    public float PreenWingNeckYawDeg { get; set; } = 70f;
+    public float PreenWingNeckPitchDeg { get; set; } = 45f;
+    public float PreenWingLiftDeg { get; set; } = 35f;
+    public float PreenNibbleDeg { get; set; } = 8f;
+    public float PreenNibbleHz { get; set; } = 6f;
+    public float PreenSwitchSideChance { get; set; } = 0.4f;
+    public float PreenBodyRollDeg { get; set; } = 8f;
+
     // 採餌・羽繕い
     public float ForageChance { get; set; } = 0.15f;
     public float PreenChance { get; set; } = 0.03f;
@@ -59,8 +86,8 @@ public sealed class SparrowParams
     public int PecksMax { get; set; } = 5;
     public float PeckDuration { get; set; } = 0.15f;
     public float PeckPitchDeg { get; set; } = 35f;
-    public float PreenDurationMin { get; set; } = 1.0f;
-    public float PreenDurationMax { get; set; } = 2.0f;
+    public float PreenDurationMin { get; set; } = 1.5f;
+    public float PreenDurationMax { get; set; } = 3.0f;
 
     // 砂浴び: プレイヤーがこの秒数止まっていたら、そこから 20〜60 秒ごとに、落ち着いたところで始める
     public float DustBathDelay { get; set; } = 3f;

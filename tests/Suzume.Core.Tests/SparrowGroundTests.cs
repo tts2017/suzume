@@ -121,7 +121,8 @@ public class SparrowGroundTests
         var p = new SparrowParams { DustBathIntervalMin = float.PositiveInfinity, DustBathIntervalMax = float.PositiveInfinity };
         var brain = new SparrowBrain(p, new SeededRandom(1), Step);
 
-        var poses = RunTo(brain, new Vector3(0.9f, 0f, -1.1f), Vector3.Zero, 40f);
+        // プレイヤーは段差の境目 (X = 1) に立っているので、周りを渡り歩くと段差の上下を行き来する
+        var poses = RunTo(brain, new Vector3(0.9f, 0f, -1.1f), new Vector3(1f, 0f, 0f), 40f);
 
         var grounded = poses.Where(x => x.State is SparrowState.Idle or SparrowState.Forage or SparrowState.Preen).ToList();
         Assert.Contains(grounded, x => x.Position.X > 1.2f); // 段差の上にも行く
