@@ -86,13 +86,15 @@ def regions(maps, original):
     # 羽毛の細かい濃淡でまだらにならないよう、赤みを大きくぼかしてから分ける (体の外は混ぜない)
     redness = (original[..., 0] - original[..., 2]) * body
     redness = blur(redness, 6) / np.maximum(blur(body.astype(np.float32), 6), 1e-3)
-    back = body & (redness > 50)
+    # 元の絵の首の後ろのクリーム色の帯も背中にする (残すと うなじまで白い襟が一周する)
+    back = body & ((redness > 50) | (bone == SEBO) & (y > 0.09) & (z < 0.01))
     paint(back, BROWN)
     # 背中の黒い縦じま: 体の前後に流れる筋を、むらで途切れさせる
     wobble = blur(np.random.default_rng(7).standard_normal((SIZE, SIZE)).astype(np.float32), 2) * 6.0
     streak = back & (np.sin(x * 420.0 + z * 40.0 + wobble) > 0.65)
     paint(streak, DARK)
-    collar = (bone == SEBO) & (y > 0.1) & (x > 0.012) & (z > -0.01)
+    # 白い襟は首の横だけ。首の後ろ (うなじ) では途切れて茶色になる
+    collar = (bone == SEBO) & (y > 0.1) & (x > 0.012) & (z > -0.01) & ((x > 0.022) | (z > 0.004))
     paint(collar, WHITE)
     # のどの黒は胸の上まで縦に細く伸びる
     bib_body = (bone == SEBO) & (z > 0.035) & (y > 0.075) & (x < 0.010 - (0.101 - y) * 0.18)
@@ -103,6 +105,7 @@ def regions(maps, original):
     # ほっぺの黒い斑点は、正面から見て目の外側・下 (目の高さに置くと、もう 1 つの目に見える)
     paint(head, WHITE)
     paint(head & ((y > 0.115) | (z < 0.0) & (y > 0.105)), CHESTNUT)
+    paint(head & (z < 0.004) & (x < 0.022) & (y <= 0.105), BROWN)                 # うなじ
     paint(head & (x < 0.014) & (y > 0.112) & (z > 0.035), CHESTNUT)                # 額
     paint(head & (y < 0.104) & (z > 0.030) & (x < 0.010), BLACK)                  # のど
     paint(head & (z > 0.041) & (x < 0.022) & (y > 0.103) & (y < 0.114), BLACK)    # 目先 (目とくちばしの間)
