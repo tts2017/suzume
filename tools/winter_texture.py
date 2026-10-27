@@ -86,16 +86,18 @@ def regions(maps, original_luma):
     paint(streak, DARK)
     collar = (bone == SEBO) & (y > 0.1) & (x > 0.012) & (z > -0.01)
     paint(collar, WHITE)
-    bib_body = (bone == SEBO) & (z > 0.035) & (y > 0.09) & (x < 0.02)
+    bib_body = (bone == SEBO) & (z > 0.035) & (y > 0.09) & (x < 0.012)
     paint(bib_body, BLACK)
 
-    # 頭: ほっぺ → 頭のてっぺん → のど → くちばしの付け根 → ほっぺの黒い斑点
+    # 頭: ほっぺ → 頭のてっぺん → のど → くちばしの付け根 → ほっぺの斑点
+    # のどとくちばしの付け根の黒は真ん中だけにする (横に広げると、目の下の帯になって顔が横に広く見える)
     paint(head, WHITE)
     paint(head & ((y > 0.127) | (z < 0.005)), CHESTNUT)
-    paint(head & (y < 0.107) & (z > 0.02), BLACK)
-    paint(head & (z > 0.047), BLACK)
-    cheek_spot = head & ((x - 0.029) ** 2 + (y - 0.115) ** 2 + (z - 0.012) ** 2 < 0.0085 ** 2)
-    paint(cheek_spot, BLACK)
+    paint(head & (y < 0.107) & (z > 0.02) & (x < 0.011), BLACK)
+    paint(head & (z > 0.047) & (x < 0.011), BLACK)
+    # ほっぺの斑点は目の後ろ下に小さく、黒褐色で (真っ黒で目の高さだと、もう 1 つの目に見える)
+    cheek_spot = head & ((x - 0.031) ** 2 + (y - 0.106) ** 2 + (z - 0.008) ** 2 < 0.0075 ** 2)
+    paint(cheek_spot, DARK)
 
     # 尾
     paint(bone == TAIL, TAIL_COLOR)
@@ -123,7 +125,9 @@ def winter_diffuse(maps, original_bgra):
     luma = original.mean(axis=2) / 255.0
 
     # 部位の境目を少しぼかしてから、元の羽毛の細かい濃淡を重ねる
-    soft = blur(color, 1)
+    # UV の島の外 (塗っていない黒) を混ぜないよう、島の中だけでぼかす (混ぜると継ぎ目が黒い線になる)
+    inside = (bone >= 0).astype(np.float32)[..., None]
+    soft = blur(color * inside, 1) / np.maximum(blur(inside, 1), 1e-3)
     detail = luma - blur(luma, 3)
     rng = np.random.default_rng(1225)
     down = blur(rng.standard_normal((SIZE, SIZE)).astype(np.float32), 1)  # ふわふわした綿毛のむら
