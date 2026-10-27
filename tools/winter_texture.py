@@ -1,9 +1,9 @@
 """タビスズメを、日本のスズメの冬羽 (ふくら雀) の色と模様に塗り替えた Penumbra mod を作る。
 
 先に tools/ExtractSparrowMaps で、元のテクスチャと画素ごとの部位・位置・法線を書き出しておく。
-numpy だけを使う。使い方:
-    dotnet run --project tools/ExtractSparrowMaps -- "<sqpack フォルダ>" out/sparrow_maps
-    py tools/winter_texture.py out/sparrow_maps out/winter
+numpy だけを使う。使い方 (羽を細かく描けるよう、1024x1024 で塗る):
+    dotnet run --project tools/ExtractSparrowMaps -- "<sqpack フォルダ>" out/sparrow_maps_1024 1024
+    py tools/winter_texture.py out/sparrow_maps_1024 out/winter
 出力:
     out/winter/preview_d.png                            塗った色 (確認用)
     out/winter/mod/...                                  Penumbra の mod フォルダ
