@@ -14,7 +14,7 @@ public sealed unsafe class HeadLocator
 {
     private const string HeadBoneName = "j_kao";
     // 頭のボーンから頭頂までの高さ(骨格のスケール 1 のとき)
-    private const float HeadTopAboveBone = 0.22f;
+    private const float HeadTopAboveBone = 0.15f;
 
     // 見つけたボーンの場所をキャッシュする(毎フレーム名前を比べない)
     private hkaSkeleton* cachedSkeleton;
