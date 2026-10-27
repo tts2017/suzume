@@ -1,6 +1,6 @@
 # 音声のクレジット
 
-鳴き声 4 種 (`contact` `song` `alarm` `flight`) は、Wikimedia Commons で公開されているイエスズメ (*Passer domesticus*) の録音から切り出し、低音の雑音を落として音量をそろえたものです。`contact` はさらに背景雑音を差し引き、主な音の筋以外の濁りを弱め、再生速度を 1.12 倍にして少し高くしています。元の録音は `assets/recordings/` にあります。切り出し方は `tools/cut_recordings.py` を参照してください。
+鳴き声 4 種 (`contact` `song` `alarm` `flight`) は、Wikimedia Commons で公開されているイエスズメ (*Passer domesticus*) の録音から切り出し、低音の雑音を落として音量をそろえたものです。`contact`・`song`・`flight` はさらに背景雑音を差し引き、主な音の筋以外の濁りを弱め、再生速度を 1.12 倍にして少し高くしています。元の録音は `assets/recordings/` にあります。切り出し方は `tools/cut_recordings.py` を参照してください。
 
 砂浴びの羽音 (`dust`) は `tools/chirps.py` で合成したものです。
 

@@ -19,25 +19,28 @@ PEAK = 0.8
 HIGHPASS_HZ = 1000
 
 # 出力名: (元の録音, 開始秒, 終了秒, フェード秒[, 加工])
+# 鳴き声を澄ませる加工 (チュン・さえずり・飛び立ちに使う)
+CLEAR = {"pitch": 1.12, "denoise": True, "tonal": True}
+
 # 加工: pitch = 再生速度の倍率 (高くなり短くなる)、denoise = 背景雑音を差し引く、
 #       tonal = 主な音の筋 (基本音と 2 倍音) だけを残して濁りを弱める
 SEGMENTS = {
     # 「チュン」地鳴き: Benoît Van Hecke のさえずりから、高く澄んだ単発の声を選び、少し高くして雑音を除く
-    "contact_1": ("vanhecke_XC543237", 4.81, 5.04, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
-    "contact_2": ("vanhecke_XC543237", 11.98, 12.22, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
-    "contact_3": ("vanhecke_XC543237", 23.93, 24.13, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
-    # 「チュンチュン」囀り: Benoît Van Hecke のオスのさえずりから 3 音ずつ
-    "song_1": ("vanhecke_XC543237", 4.80, 6.20, 0.02),
-    "song_2": ("vanhecke_XC543237", 15.53, 16.57, 0.02),
-    "song_3": ("vanhecke_XC543237", 25.49, 26.76, 0.02),
+    "contact_1": ("vanhecke_XC543237", 4.81, 5.04, 0.01, CLEAR),
+    "contact_2": ("vanhecke_XC543237", 11.98, 12.22, 0.01, CLEAR),
+    "contact_3": ("vanhecke_XC543237", 23.93, 24.13, 0.01, CLEAR),
+    # 「チュンチュン」囀り: Benoît Van Hecke のオスのさえずりから 3 音ずつ、澄ませる
+    "song_1": ("vanhecke_XC543237", 4.80, 6.20, 0.02, CLEAR),
+    "song_2": ("vanhecke_XC543237", 15.53, 16.57, 0.02, CLEAR),
+    "song_3": ("vanhecke_XC543237", 25.49, 26.76, 0.02, CLEAR),
     # 「ジュクジュク」警戒・騒ぎ声: Wildlife sound の群れの chattering
     "alarm_1": ("wildlifesound_chattering", 41.55, 42.15, 0.04),
     "alarm_2": ("wildlifesound_chattering", 44.20, 44.80, 0.04),
     "alarm_3": ("wildlifesound_chattering", 15.15, 15.75, 0.04),
-    # 「チュリッ」飛び立ち: ngoomie の掛け合いから 2 山の声
-    "flight_1": ("ngoomie_202279702", 2.14, 2.58, 0.01),
-    "flight_2": ("ngoomie_202279702", 4.75, 5.24, 0.01),
-    "flight_3": ("ngoomie_202279702", 26.74, 27.24, 0.01),
+    # 「チュリッ」飛び立ち: ngoomie の掛け合いから 2 山の声、澄ませる
+    "flight_1": ("ngoomie_202279702", 2.14, 2.58, 0.01, CLEAR),
+    "flight_2": ("ngoomie_202279702", 4.75, 5.24, 0.01, CLEAR),
+    "flight_3": ("ngoomie_202279702", 26.74, 27.24, 0.01, CLEAR),
 }
 
 
