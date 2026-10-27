@@ -8,7 +8,10 @@
     <Nullable>enable</Nullable>
     <NoWarn>MSB3277</NoWarn>
     <DalamudDev>$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudDev>
-    <PenumbraDir>$([System.IO.Directory]::GetDirectories('$(AppData)\XIVLauncher\installedPlugins\Penumbra')[0])\</PenumbraDir>
+    <PenumbraInstall>$(AppData)\XIVLauncher\installedPlugins\Penumbra</PenumbraInstall>
+    <!-- インストール済みの Penumbra があればそれを、なければ Penumourer のビルドを使う。dotnet run -p:PenumbraDir=... で指定もできる -->
+    <PenumbraDir Condition="'$(PenumbraDir)' == '' And Exists('$(PenumbraInstall)') And $([System.IO.Directory]::GetDirectories('$(PenumbraInstall)').Length) &gt; 0">$([System.IO.Directory]::GetDirectories('$(PenumbraInstall)')[0])\</PenumbraDir>
+    <PenumbraDir Condition="'$(PenumbraDir)' == ''">G:\ff14\Penumourer\Penumourer\bin\Debug\</PenumbraDir>
   </PropertyGroup>
 
   <ItemGroup>

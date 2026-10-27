@@ -1,10 +1,10 @@
 // タビスズメ (m8217 b0001) のテクスチャと、テクスチャの各画素が体のどこにあたるかを書き出す。
 // tools/winter_texture.py が、これを使って冬羽のテクスチャを塗る。
 //
-// 使い方: dotnet run --project tools/ExtractSparrowMaps -- <ゲームの sqpack フォルダ> <出力フォルダ>
+// 使い方: dotnet run --project tools/ExtractSparrowMaps -- <ゲームの sqpack フォルダ> <出力フォルダ> [maps の大きさ (既定 256)]
 // 出力:
 //   d.bgra / n.bgra / s.bgra  元のテクスチャ (256x256、BGRA 8bit)
-//   maps.f32                  画素ごとに [ボーン番号, 位置 x, y, z, 法線 x, y, z] (float32、ボーン番号 -1 は未使用の画素)
+//   maps.f32                  maps の大きさの画素ごとに [ボーン番号, 位置 x, y, z, 法線 x, y, z] (float32、ボーン番号 -1 は未使用の画素)
 //   bones.txt                 ボーン番号と名前
 using System.Numerics;
 using Lumina;
@@ -14,13 +14,16 @@ using VU = Lumina.Models.Models.Vertex.VertexUsage;
 
 const string Model = "chara/monster/m8217/obj/body/b0001/model/m8217b0001.mdl";
 const string TexturePrefix = "chara/monster/m8217/obj/body/b0001/texture/v01_m8217b0001_";
-const int Size = 256;
+const int TextureSize = 256;
 
-if (args.Length != 2)
+if (args.Length is not (2 or 3))
 {
-    Console.Error.WriteLine("使い方: ExtractSparrowMaps <sqpack フォルダ> <出力フォルダ>");
+    Console.Error.WriteLine("使い方: ExtractSparrowMaps <sqpack フォルダ> <出力フォルダ> [maps の大きさ]");
     return 1;
 }
+
+// テクスチャを大きくして細かく塗れるよう、maps は元のテクスチャより大きくできる (UV は割合なので同じ島になる)
+var Size = args.Length == 3 ? int.Parse(args[2]) : TextureSize;
 
 var game = new GameData(args[0]);
 var output = Directory.CreateDirectory(args[1]).FullName;
@@ -28,9 +31,9 @@ var output = Directory.CreateDirectory(args[1]).FullName;
 foreach (var kind in new[] { "d", "n", "s" })
 {
     var tex = game.GetFile<TexFile>(TexturePrefix + kind + ".tex") ?? throw new FileNotFoundException(kind);
-    if (tex.Header.Width != Size || tex.Header.Height != Size)
+    if (tex.Header.Width != TextureSize || tex.Header.Height != TextureSize)
         throw new InvalidDataException($"{kind}: {tex.Header.Width}x{tex.Header.Height}");
-    File.WriteAllBytes(Path.Combine(output, kind + ".bgra"), tex.ImageData[..(Size * Size * 4)]);
+    File.WriteAllBytes(Path.Combine(output, kind + ".bgra"), tex.ImageData[..(TextureSize * TextureSize * 4)]);
 }
 
 var mdl = new Penumbra.GameData.Files.MdlFile(game.GetFile(Model)!.Data);
