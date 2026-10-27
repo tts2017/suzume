@@ -33,6 +33,9 @@ public sealed unsafe class PoseApplier
     // ゲームが平常時に入れている DrawOffset
     private static readonly Vector3 BaseDrawOffset = Vector3.Zero;
 
+    // 最後に再生させたアニメ。0 は未再生
+    private ushort lastTimelineId;
+
     public void Apply(Companion* minion, in SparrowPose pose)
     {
         var go = (GameObject*)minion;
@@ -49,8 +52,15 @@ public sealed unsafe class PoseApplier
         offset += BaseDrawOffset;
         go->SetDrawOffset(offset.X, offset.Y, offset.Z);
 
-        ((Character*)minion)->Timeline.BaseOverride =
-            pose.Anim == SparrowAnim.Fly ? FlyTimelineId : IdleTimelineId;
+        var timelineId = pose.Anim == SparrowAnim.Fly ? FlyTimelineId : IdleTimelineId;
+        var timeline = &((Character*)minion)->Timeline;
+        timeline->BaseOverride = timelineId;
+        // AI を止めているとゲームがベースアニメを選び直さないので、切り替わったときに 1 回だけ直接再生する
+        if (lastTimelineId != timelineId)
+        {
+            timeline->TimelineSequencer.PlayTimeline(timelineId, null);
+            lastTimelineId = timelineId;
+        }
 
         if (PitchWrite == PitchMode.Update)
             WritePitch(go, pose);
@@ -69,6 +79,7 @@ public sealed unsafe class PoseApplier
         var go = (GameObject*)minion;
         go->SetDrawOffset(BaseDrawOffset.X, BaseDrawOffset.Y, BaseDrawOffset.Z);
         ((Character*)minion)->Timeline.BaseOverride = 0;
+        lastTimelineId = 0;
         ClearPitch(go);
     }
 
