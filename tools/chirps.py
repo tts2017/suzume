@@ -1,5 +1,6 @@
-"""タビスズメの鳴き声 4 種 × 3 バリエーションを合成して WAV に書き出す。
+"""砂浴びの羽音 (dust) 3 バリエーションを合成して WAV に書き出す。
 
+鳴き声 4 種は録音から切り出す (tools/cut_recordings.py)。ここでは羽音だけを作る。
 numpy だけを使う。使い方:
     py tools/chirps.py assets/sounds
 """
@@ -30,61 +31,6 @@ def bandpass(signal, low, high):
     return np.fft.irfft(spectrum, len(signal))
 
 
-def tone(duration, freq_points, harmonics=(1.0, 0.35, 0.12), attack=0.1, release=0.5):
-    """周波数を freq_points に沿って動かす、倍音付きの音"""
-    n = int(RATE * duration)
-    t = np.linspace(0.0, 1.0, n, endpoint=False)
-    freq = np.interp(t, np.linspace(0.0, 1.0, len(freq_points)), freq_points)
-    phase = 2.0 * np.pi * np.cumsum(freq) / RATE
-    signal = sum(amp * np.sin(k * phase) for k, amp in enumerate(harmonics, start=1))
-    return signal * envelope(n, attack, release)
-
-
-def chun(rng, duration, base):
-    """「チュン」1 音: 少し上がってから大きく下がる。息っぽいノイズを少し混ぜる"""
-    body = tone(duration, [base * 0.85, base * 1.08, base * 0.72])
-    breath = bandpass(rng.standard_normal(len(body)), 2500, 7000) * envelope(len(body), 0.05, 0.6)
-    return body + 0.15 * breath / (np.max(np.abs(breath)) + 1e-9)
-
-
-def contact(rng):
-    """「チュン」地鳴き"""
-    return chun(rng, rng.uniform(0.08, 0.12), rng.uniform(3500, 4500))
-
-
-def song(rng):
-    """「チュンチュン」囀り: 2〜4 音を、音の頭から 0.12〜0.2 秒間隔で"""
-    base = rng.uniform(3500, 4500)
-    parts = []
-    for _ in range(int(rng.integers(2, 5))):
-        note = chun(rng, rng.uniform(0.08, 0.11), base * rng.uniform(0.92, 1.08))
-        parts.append(note)
-        parts.append(np.zeros(max(0, int(RATE * rng.uniform(0.12, 0.2)) - len(note))))
-    return np.concatenate(parts[:-1])
-
-
-def alarm(rng):
-    """「ジュクジュク」警戒: 3〜7kHz の雑音とざらついた音を、約 12Hz で断続させる"""
-    n = int(RATE * rng.uniform(0.4, 0.6))
-    t = np.arange(n) / RATE
-    noise = bandpass(rng.standard_normal(n), 3000, 7000)
-    noise /= np.max(np.abs(noise)) + 1e-9
-    buzz = np.sin(2 * np.pi * rng.uniform(3300, 3800) * t) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 120 * t)))
-    pulses = (0.5 + 0.5 * np.sin(2 * np.pi * rng.uniform(11, 14) * t)) ** 3
-    return (0.7 * noise + 0.4 * buzz) * pulses * envelope(n, 0.03, 0.15)
-
-
-def flight(rng):
-    """「チュリリ」飛び立ち: 上がる短い音を 15〜20Hz で転がす"""
-    out = np.zeros(int(RATE * rng.uniform(0.25, 0.35)))
-    rate = rng.uniform(15, 20)
-    period = int(RATE / rate)
-    element = tone(0.7 / rate, [3000, 5000], harmonics=(1.0, 0.25), attack=0.15, release=0.4)
-    for start in range(0, len(out) - len(element), period):
-        out[start:start + len(element)] += element * rng.uniform(0.8, 1.0)
-    return out * envelope(len(out), 0.05, 0.3)
-
-
 def dust(rng):
     """「バサバサ」砂浴びの羽音: 約 20Hz の羽ばたきで低めの風切り音を断続させ、砂のこすれを混ぜる"""
     n = int(RATE * rng.uniform(0.5, 0.9))
@@ -113,16 +59,16 @@ def write_wav(path, signal):
         w.writeframes(data.tobytes())
 
 
-KINDS = {"contact": contact, "song": song, "alarm": alarm, "flight": flight, "dust": dust}
+KINDS = {"dust": dust}
 
 
 def main(out_dir):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    for kind_index, (name, make) in enumerate(KINDS.items()):
+    for name, make in KINDS.items():
         for variant in range(1, VARIANTS + 1):
-            # 種類と番号から決まるシードで、何度実行しても同じ音になる
-            rng = np.random.default_rng(1000 * kind_index + variant)
+            # 番号から決まるシードで、何度実行しても同じ音になる(以前の 5 種合成時と同じシード)
+            rng = np.random.default_rng(4000 + variant)
             path = out / f"{name}_{variant}.wav"
             write_wav(path, normalize(make(rng), PEAK_BY_KIND.get(name, PEAK)))
             print(path)
