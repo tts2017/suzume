@@ -70,6 +70,12 @@ public sealed class SparrowBrain
     private Vector3 wanderPoint;
     private float wanderCountdown;
     private bool perchIntent;
+    // 攻撃的なエモートで逃げた先。様子をうかがう間はここを目標にする
+    private bool scared;
+    private Vector3 scarePoint;
+    private float waryCountdown;
+    // 様子見が終わって戻る途中。離れていればホップではなく飛んで戻る
+    private bool returning;
     private Vector3 landStartPosition;
 
     public SparrowBrain(SparrowParams parameters, IRandom random)
@@ -100,8 +106,11 @@ public sealed class SparrowBrain
 
         UpdateWander(input, dt);
         UpdateDustBathTimer(dt);
+        UpdateWary(dt);
         goal = Goal(input);
-        if (input.PerchRequested)
+        if (input.Threatened)
+            OnThreatened(input);
+        else if (input.PerchRequested)
             OnBeckoned(input);
 
         switch (state)
@@ -151,6 +160,8 @@ public sealed class SparrowBrain
         hop = null;
         alarmCooldown = 0f;
         perchIntent = false;
+        scared = false;
+        returning = false;
         hasWanderPoint = false;
         playerStillTime = 0f;
         goal = input.Target;
@@ -169,7 +180,47 @@ public sealed class SparrowBrain
     // ---- 動き回る・頭に乗る ----
 
     private Vector3 Goal(in SparrowInput input) =>
-        perchIntent ? input.HeadPosition : hasWanderPoint ? wanderPoint : input.Target;
+        scared ? scarePoint with { Y = input.Target.Y }
+        : perchIntent ? input.HeadPosition
+        : hasWanderPoint ? wanderPoint
+        : input.Target;
+
+    /// <summary>攻撃的なエモートをされた: 警戒の声を上げ、プレイヤーと反対へ飛んで逃げる(頭の上からでも)。</summary>
+    private void OnThreatened(in SparrowInput input)
+    {
+        var away = Angles.Horizontal(position - input.PlayerPosition);
+        // 頭の上などで真上にいるときは、プレイヤーの向きの反対へ逃げる
+        var direction = away.Length() > 0.3f
+            ? Vector3.Normalize(away)
+            : -new Vector3(MathF.Sin(input.TargetYaw), 0f, MathF.Cos(input.TargetYaw));
+
+        scared = true;
+        perchIntent = false;
+        scarePoint = input.PlayerPosition + direction * (Angles.HorizontalDistance(position, input.PlayerPosition)
+            + rng.Range(p.ScareFleeDistanceMin, p.ScareFleeDistanceMax));
+        waryCountdown = rng.Range(p.WaryDurationMin, p.WaryDurationMax);
+        alarmCooldown = p.AlarmCooldown;
+        triggers |= SparrowTrigger.Alarm;
+        goal = Goal(input);
+
+        // 飛んでいる途中なら行き先が変わるだけ
+        if (state is not (SparrowState.TakeOff or SparrowState.Fly or SparrowState.Land))
+            EnterTakeOff(input);
+    }
+
+    /// <summary>逃げた先に降りてから、しばらく様子をうかがったら元の暮らしに戻る。</summary>
+    private void UpdateWary(float dt)
+    {
+        if (!scared || state is SparrowState.TakeOff or SparrowState.Fly or SparrowState.Land)
+            return;
+
+        waryCountdown -= dt;
+        if (waryCountdown <= 0f)
+        {
+            scared = false;
+            returning = true;
+        }
+    }
 
     /// <summary>プレイヤーがしばらく止まっていたら、周りの地点をときどき選び直して渡り歩く。</summary>
     private void UpdateWander(in SparrowInput input, float dt)
@@ -267,7 +318,7 @@ public sealed class SparrowBrain
         var gap = Angles.HorizontalDistance(position, goal);
         var fast = input.PlayerMounted || Angles.Horizontal(input.PlayerVelocity).Length() > p.SprintSpeed;
         return gap > p.FlyDistance
-            || (fast && gap > p.FastFlyDistance)
+            || ((fast || returning) && gap > p.FastFlyDistance)
             || MathF.Abs(goal.Y - position.Y) > p.FlyHeightTrigger;
     }
 
@@ -666,7 +717,10 @@ public sealed class SparrowBrain
         position.Y = groundY + altitude;
 
         if (u >= 1f)
+        {
+            returning = false;
             EnterIdle(afterLanding: true);
+        }
     }
 
     /// <summary>

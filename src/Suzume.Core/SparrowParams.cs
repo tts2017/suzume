@@ -109,6 +109,11 @@ public sealed class SparrowParams
     public float AlarmCooldown { get; set; } = 10f;
     public int AlarmHopsMin { get; set; } = 1;
     public int AlarmHopsMax { get; set; } = 3;
+    // 攻撃的なエモートをされたら、この距離だけ飛んで逃げ、この時間は離れたまま様子をうかがう
+    public float ScareFleeDistanceMin { get; set; } = 4f;
+    public float ScareFleeDistanceMax { get; set; } = 6f;
+    public float WaryDurationMin { get; set; } = 5f;
+    public float WaryDurationMax { get; set; } = 10f;
 
     // 鳴き声
     public float ChirpMinInterval { get; set; } = 1.5f;

@@ -49,6 +49,13 @@ public class ChirpSchedulerTests
     }
 
     [Fact]
+    public void AlarmWinsOverTakeOffWhenScaredAway()
+    {
+        var scheduler = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));
+        Assert.Equal(ChirpKind.Alarm, scheduler.Update(Dt, SparrowState.TakeOff, SparrowTrigger.Alarm | SparrowTrigger.TakeOff));
+    }
+
+    [Fact]
     public void DustFlutterPlaysRustleWithoutTouchingCooldown()
     {
         var scheduler = new ChirpScheduler(new SparrowParams(), new SequenceRandom(0f));
