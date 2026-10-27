@@ -13,7 +13,8 @@ public sealed class ChirpPlayer : IDisposable
 
     private readonly Dictionary<ChirpKind, float[][]> clips = new();
     private readonly MixingSampleProvider mixer = new(Format) { ReadFully = true };
-    private readonly WaveOutEvent output = new() { DesiredLatency = 100 };
+    // ゲームの負荷で出力スレッドが遅れても途切れない(プチッと鳴らない)よう、バッファを厚めにする
+    private readonly WaveOutEvent output = new() { DesiredLatency = 200, NumberOfBuffers = 3 };
     private readonly Random random = new();
 
     public ChirpPlayer()
