@@ -43,7 +43,7 @@ public enum SparrowTrigger
     LongIdleStart = 4,
 }
 
-/// <param name="Target">ゲームの AI が決めたミニオンの論理位置(地面の高さ込み)</param>
+/// <param name="Target">スズメが付いていく地上の目標地点(地面の高さ込み)</param>
 /// <param name="TargetYaw">論理位置での向き。置き直すときに使う</param>
 public readonly record struct SparrowInput(
     float Dt,

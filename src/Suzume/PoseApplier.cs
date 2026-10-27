@@ -66,8 +66,18 @@ public sealed unsafe class PoseApplier
     /// <summary>ゲーム本来の見た目に戻す。論理位置は AI がそのまま引き継ぐ。</summary>
     public void Release(Companion* minion)
     {
-        ((GameObject*)minion)->SetDrawOffset(BaseDrawOffset.X, BaseDrawOffset.Y, BaseDrawOffset.Z);
+        var go = (GameObject*)minion;
+        go->SetDrawOffset(BaseDrawOffset.X, BaseDrawOffset.Y, BaseDrawOffset.Z);
         ((Character*)minion)->Timeline.BaseOverride = 0;
+        ClearPitch(go);
+    }
+
+    /// <summary>前傾は書き込んだまま残るので、向きだけの回転に戻す。</summary>
+    public static void ClearPitch(GameObject* go)
+    {
+        var draw = go->DrawObject;
+        if (draw != null)
+            draw->Object.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, go->Rotation);
     }
 
     private static void WritePitch(GameObject* go, in SparrowPose pose)

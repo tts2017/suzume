@@ -88,7 +88,7 @@ public sealed class SparrowBrain
                 TickPreen(input);
                 break;
             case SparrowState.TakeOff:
-                TickTakeOff(dt);
+                TickTakeOff(input, dt);
                 break;
             case SparrowState.Fly:
                 TickFly(input, dt);
@@ -251,15 +251,10 @@ public sealed class SparrowBrain
             var delta = Angles.Horizontal(input.Target - position);
             var gap = delta.Length();
             // 1 回で届く距離なら目標に直接降りる(段差の途中で止まらないように)
-            if (gap <= p.HopDistanceMax)
-            {
-                to = input.Target;
-            }
-            else
-            {
-                to = position + delta / gap * distance;
-                to.Y = position.Y + (input.Target.Y - position.Y) * (distance / gap);
-            }
+            var share = gap <= p.HopDistanceMax ? 1f : distance / gap;
+            to = position + delta * share;
+            // 1 回で上り下りする高さには限りがある。大きな段差は数回に分けるか、飛んで越える
+            to.Y = position.Y + Math.Clamp((input.Target.Y - position.Y) * share, -p.MaxHopRise, p.MaxHopRise);
         }
 
         // 向きはホップの前に一瞬で変える。跳んでいる間は変えない
@@ -373,9 +368,10 @@ public sealed class SparrowBrain
             yaw = Angles.YawTowards(position, input.Target);
     }
 
-    private void TickTakeOff(float dt)
+    private void TickTakeOff(in SparrowInput input, float dt)
     {
         altitude += p.TakeOffClimbSpeed * dt;
+        MoveTowards(input.Target, p.FlySpeed * 0.5f * dt, dt);
         position.Y = groundY + altitude;
         if (stateTime < p.TakeOffDuration)
             return;
@@ -400,10 +396,14 @@ public sealed class SparrowBrain
 
         // 騎乗中などで論理位置が速く動くときは、それより速く飛ぶ
         var speed = MathF.Max(p.FlySpeed, Angles.Horizontal(input.PlayerVelocity).Length() * 1.3f);
-        MoveHorizontallyTowards(input.Target, speed * dt);
+        MoveTowards(input.Target, speed * dt, dt);
         position.Y = groundY + altitude;
 
-        if (Angles.HorizontalDistance(position, input.Target) < p.LandDistance)
+        // プレイヤーが速く動いている間は降りずに付いていく。地面の高さが目標に追いつくまでは降りない
+        var playerSlow = Angles.Horizontal(input.PlayerVelocity).Length() < p.LandPlayerSpeed;
+        if (playerSlow
+            && Angles.HorizontalDistance(position, input.Target) < p.LandDistance
+            && MathF.Abs(input.Target.Y - groundY) < Epsilon)
         {
             SetState(SparrowState.Land);
             landStartAltitude = altitude;
@@ -414,24 +414,27 @@ public sealed class SparrowBrain
     {
         var u = MathF.Min(1f, stateTime / p.LandDuration);
         altitude = landStartAltitude * (1f - u);
-        MoveHorizontallyTowards(input.Target, p.FlySpeed * 0.5f * dt);
+        MoveTowards(input.Target, p.FlySpeed * 0.5f * dt, dt);
         position.Y = groundY + altitude;
 
         if (u >= 1f)
             EnterIdle(afterLanding: true);
     }
 
-    /// <summary>水平に step だけ進み、地面の高さも進んだ割合だけ目標に近づける。</summary>
-    private void MoveHorizontallyTowards(Vector3 target, float step)
+    /// <summary>
+    /// 水平に step だけ進む。地面の高さの基準も、進んだ割合だけ目標へ近づける(一度に動く量は GroundFollowSpeed まで)。
+    /// </summary>
+    private void MoveTowards(Vector3 target, float step, float dt)
     {
         var delta = Angles.Horizontal(target - position);
         var gap = delta.Length();
+        var share = gap <= step ? 1f : step / gap;
+        var maxGroundChange = p.GroundFollowSpeed * dt;
+        groundY += Math.Clamp((target.Y - groundY) * share, -maxGroundChange, maxGroundChange);
         if (gap <= Epsilon)
             return;
 
         yaw = Angles.YawTowards(position, target);
-        step = MathF.Min(step, gap);
-        groundY += (target.Y - groundY) * (step / gap);
-        position += delta / gap * step;
+        position += delta / gap * MathF.Min(step, gap);
     }
 }

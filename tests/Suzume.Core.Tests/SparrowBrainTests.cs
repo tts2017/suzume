@@ -212,6 +212,63 @@ public class SparrowBrainTests
         Assert.True(maxGap < p.ResetDistance * 0.5f, $"maxGap={maxGap}");
     }
 
+    [Theory]
+    [InlineData(6f, false)]
+    [InlineData(9f, true)]
+    public void StaysAirborneWhileFollowingFastPlayer(float speed, bool mounted)
+    {
+        var brain = NewBrain();
+        brain.Tick(Input(Vector3.Zero));
+        var velocity = new Vector3(speed, 0f, 0f);
+        var takeOffs = 0;
+
+        for (var i = 1; i <= 1200; i++)
+        {
+            var target = velocity * (i * Dt);
+            var pose = brain.Tick(Input(target, target + new Vector3(1.5f, 0f, 0f), velocity, mounted));
+            if (pose.Triggers.HasFlag(SparrowTrigger.TakeOff))
+                takeOffs++;
+        }
+
+        Assert.True(takeOffs <= 1, $"takeOffs={takeOffs}");
+    }
+
+    [Fact]
+    public void LandsOnceFastPlayerStops()
+    {
+        var brain = NewBrain();
+        brain.Tick(Input(Vector3.Zero));
+        var velocity = new Vector3(9f, 0f, 0f);
+        var target = Vector3.Zero;
+        for (var i = 1; i <= 300; i++)
+        {
+            target = velocity * (i * Dt);
+            brain.Tick(Input(target, target + new Vector3(1.5f, 0f, 0f), velocity, mounted: true));
+        }
+
+        var poses = Run(brain, Input(target, target + new Vector3(1.5f, 0f, 0f), Vector3.Zero, mounted: true), 5f);
+
+        Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
+        Assert.Equal(target.Y, poses[^1].Position.Y, 3);
+    }
+
+    [Fact]
+    public void FluttersUpOntoHighLedgeWithoutTeleporting()
+    {
+        var brain = NewBrain();
+        brain.Tick(Input(Vector3.Zero));
+        var target = new Vector3(0.3f, 1.5f, 0f);
+
+        var poses = Run(brain, Input(target), 6f);
+
+        Assert.Contains(poses, x => x.Triggers.HasFlag(SparrowTrigger.TakeOff));
+        Assert.All(poses.Zip(poses.Skip(1)), pair =>
+            Assert.True(MathF.Abs(pair.Second.Position.Y - pair.First.Position.Y) < 0.15f,
+                $"{pair.First.Position.Y} -> {pair.Second.Position.Y}"));
+        Assert.Equal(SparrowAnim.Idle, poses[^1].Anim);
+        Assert.Equal(1.5f, poses[^1].Position.Y, 3);
+    }
+
     [Fact]
     public void FleesWithAlarmWhenPlayerRushesIn()
     {

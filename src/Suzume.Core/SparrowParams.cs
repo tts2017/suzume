@@ -23,7 +23,10 @@ public sealed class SparrowParams
     public float ScanAngleMinDeg { get; set; } = 20f;
     public float ScanAngleMaxDeg { get; set; } = 70f;
     public float ArriveDistance { get; set; } = 0.4f;
-    public float StepHeight { get; set; } = 0.3f;
+    // この高低差を超えたら、その場で止まらずにホップで合わせる
+    public float StepHeight { get; set; } = 0.05f;
+    // 1 回のホップで上り下りできる高さ
+    public float MaxHopRise { get; set; } = 0.2f;
 
     // 採餌・羽繕い
     public float ForageChance { get; set; } = 0.15f;
@@ -39,7 +42,8 @@ public sealed class SparrowParams
     public float FlyDistance { get; set; } = 6f;
     public float FastFlyDistance { get; set; } = 1.5f;
     public float SprintSpeed { get; set; } = 7.5f;
-    public float FlyHeightTrigger { get; set; } = 2f;
+    // この高低差を超えたら、ホップではなく飛んで上り下りする
+    public float FlyHeightTrigger { get; set; } = 0.5f;
     public float TakeOffDuration { get; set; } = 0.25f;
     public float TakeOffClimbSpeed { get; set; } = 2f;
     public float FlySpeed { get; set; } = 8f;
@@ -50,6 +54,10 @@ public sealed class SparrowParams
     public float FlyAltitudeMin { get; set; } = 0.5f;
     public float FlyAltitudeMax { get; set; } = 2.0f;
     public float LandDistance { get; set; } = 1.0f;
+    // プレイヤーがこれより速く動いている間は着地せず、飛んだまま付いていく
+    public float LandPlayerSpeed { get; set; } = 3f;
+    // 飛行中に地面の高さの基準を目標へ合わせる速さ (yalm/秒)
+    public float GroundFollowSpeed { get; set; } = 3f;
     public float LandDuration { get; set; } = 0.25f;
     public float LandSettleDuration { get; set; } = 0.15f;
     public float LandPitchDeg { get; set; } = 15f;

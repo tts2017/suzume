@@ -87,6 +87,7 @@ public sealed unsafe class ProbeRunner
 
         ((GameObject*)minion)->SetDrawOffset(0f, 0f, 0f);
         ((Character*)minion)->Timeline.BaseOverride = 0;
+        PoseApplier.ClearPitch((GameObject*)minion);
     }
 
     public string Describe()
