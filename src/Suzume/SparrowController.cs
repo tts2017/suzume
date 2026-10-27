@@ -16,6 +16,13 @@ public sealed unsafe class SparrowController : IDisposable
     private const ushort BeckonTimelineId = 697;
     // GameObject.Height が取れないときの頭の高さ
     private const float FallbackHeadHeight = 1.7f;
+    // スズメを驚かせる攻撃的なエモートの ActionTimeline:
+    // 不満を表す /angry, 怒る /furious, 平手打ち /slap, 戦いに備える /battlestance,
+    // 格闘訓練 /box, 地団駄を踏む /stomp, 投げる /throw
+    private static readonly HashSet<ushort> AggressiveTimelineIds = [690, 639, 691, 664, 3752, 3755, 3778, 5809, 5814, 8179, 641];
+    // 「スズメに向けて」とみなす範囲: ターゲットしているか、前方この距離・角度以内
+    private const float ThreatDistance = 6f;
+    private const float ThreatHalfAngleDeg = 40f;
 
     private readonly Configuration config;
     private readonly ChirpPlayer? chirpPlayer;
@@ -25,6 +32,7 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly PoseApplier applier = new();
     private readonly GroundTracker ground = new();
     private readonly RisingEdge beckon = new();
+    private readonly RisingEdge aggression = new();
     private readonly HeadLocator headLocator = new();
     // 調査用: 直前に見たプレイヤーのスロット 0〜2 のアニメ
     private readonly ushort[] lastPlayerTimelines = new ushort[3];
@@ -86,6 +94,7 @@ public sealed unsafe class SparrowController : IDisposable
         brain.Invalidate();
         ground.Reset();
         beckon.Reset();
+        aggression.Reset();
         lastPlayerPosition = null;
     }
 
@@ -115,12 +124,16 @@ public sealed unsafe class SparrowController : IDisposable
         var head = HeadPosition(player, playerPosition);
         LogPlayerTimelineChanges(owner);
         var beckoned = beckon.Update(IsBeckoning(owner));
+        var threatened = aggression.Update(IsAggressive(owner))
+            && (IsTargeted(minion) || Facing.IsInFront(playerPosition, player->Rotation, LastPose.Position, ThreatDistance, ThreatHalfAngleDeg));
+        if (threatened)
+            Plugin.Log.Debug($"攻撃的なエモートを検出 (状態 {LastPose.State})");
         if (beckoned)
             Plugin.Log.Debug($"手まねきを検出 (状態 {LastPose.State}) Height={player->Height:F2} 頭={head:F2}");
 
         var pose = brain.Tick(new SparrowInput(
             dt, target, player->Rotation, playerPosition, playerVelocity, Plugin.Condition[ConditionFlag.Mounted],
-            head, beckoned, jumping));
+            head, beckoned, jumping, threatened));
         if (pose.State != LastPose.State)
             Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
         applier.Apply(minion, pose);
@@ -162,6 +175,20 @@ public sealed unsafe class SparrowController : IDisposable
             lastPlayerTimelines[slot] = id;
             Plugin.Log.Debug($"プレイヤー slot{slot} = {id}");
         }
+    }
+
+    /// <summary>プレイヤーが攻撃的なエモートを再生中か(全身・上半身のどちらのスロットでも)。</summary>
+    private static bool IsAggressive(Character* owner)
+    {
+        var sequencer = &owner->Timeline.TimelineSequencer;
+        return AggressiveTimelineIds.Contains(sequencer->GetSlotTimeline(0))
+            || AggressiveTimelineIds.Contains(sequencer->GetSlotTimeline(1));
+    }
+
+    private static bool IsTargeted(Companion* minion)
+    {
+        var target = Plugin.TargetManager.Target;
+        return target != null && target.Address == (nint)minion;
     }
 
     private void ReleaseIfActive()

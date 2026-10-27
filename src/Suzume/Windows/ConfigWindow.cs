@@ -71,6 +71,7 @@ public sealed class ConfigWindow : Window
         }
 
         ImGui.TextDisabled("/beckon (手まねき) で頭に乗り、もう一度で下ります");
+        ImGui.TextDisabled("スズメに向けて /angry /furious /slap /battlestance /box /stomp /throw をすると逃げます");
 
         ImGui.Separator();
         ImGui.TextUnformatted("試聴");
