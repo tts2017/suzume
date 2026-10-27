@@ -18,12 +18,14 @@ PEAK = 0.8
 # 鳴き声より下の帯域(風・車・ハンドリングの雑音)を落とす
 HIGHPASS_HZ = 1000
 
-# 出力名: (元の録音, 開始秒, 終了秒, フェード秒)
+# 出力名: (元の録音, 開始秒, 終了秒, フェード秒[, 加工])
+# 加工: pitch = 再生速度の倍率 (高くなり短くなる)、denoise = 背景雑音を差し引く、
+#       tonal = 主な音の筋 (基本音と 2 倍音) だけを残して濁りを弱める
 SEGMENTS = {
-    # 「チュン」地鳴き: Joseph Sardin の tschilp call
-    "contact_1": ("sardin_tschilp", 0.10, 0.36, 0.01),
-    "contact_2": ("sardin_tschilp", 1.33, 1.59, 0.01),
-    "contact_3": ("sardin_tschilp", 3.96, 4.22, 0.01),
+    # 「チュン」地鳴き: Benoît Van Hecke のさえずりから、高く澄んだ単発の声を選び、少し高くして雑音を除く
+    "contact_1": ("vanhecke_XC543237", 4.81, 5.04, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
+    "contact_2": ("vanhecke_XC543237", 11.98, 12.22, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
+    "contact_3": ("vanhecke_XC543237", 23.93, 24.13, 0.01, {"pitch": 1.12, "denoise": True, "tonal": True}),
     # 「チュンチュン」囀り: Benoît Van Hecke のオスのさえずりから 3 音ずつ
     "song_1": ("vanhecke_XC543237", 4.80, 6.20, 0.02),
     "song_2": ("vanhecke_XC543237", 15.53, 16.57, 0.02),
@@ -54,6 +56,52 @@ def highpass(signal, cutoff):
     return np.fft.irfft(spectrum, len(signal))
 
 
+def denoise(signal, context, frame=512, strength=1.5):
+    """スペクトル減算: context (前後を含む長めの区間) から周波数ごとの背景雑音を推定し、signal から差し引く"""
+    window = np.hanning(frame)
+    hop = frame // 4
+
+    def stft(x):
+        return np.array([np.fft.rfft(x[i:i + frame] * window) for i in range(0, len(x) - frame, hop)])
+
+    # 鳴いていない時間が多いので、各周波数の小さい方 20% を雑音とみなす
+    noise = np.percentile(np.abs(stft(context)), 20, axis=0)
+    spec = stft(np.concatenate([signal, np.zeros(frame)]))
+    magnitude = np.maximum(np.abs(spec) - strength * noise, 0.0)
+    cleaned = magnitude * np.exp(1j * np.angle(spec))
+    out = np.zeros(len(signal) + frame)
+    norm = np.zeros(len(signal) + frame)
+    for k, i in enumerate(range(0, len(out) - frame, hop)):
+        out[i:i + frame] += np.fft.irfft(cleaned[k], frame) * window
+        norm[i:i + frame] += window ** 2
+    return (out / np.maximum(norm, 1e-6))[:len(signal)]
+
+
+def tonal(signal, frame=512, keep_hz=250, residual=0.15):
+    """各瞬間の一番強い音 (2〜8kHz) とその 2 倍音の近くだけを残し、それ以外を residual 倍に弱める"""
+    window = np.hanning(frame)
+    hop = frame // 4
+    freqs = np.fft.rfftfreq(frame, 1.0 / RATE)
+    band = (freqs >= 2000) & (freqs <= 8000)
+    padded = np.concatenate([signal, np.zeros(frame)])
+    out = np.zeros(len(padded))
+    norm = np.zeros(len(padded))
+    for i in range(0, len(padded) - frame, hop):
+        spec = np.fft.rfft(padded[i:i + frame] * window)
+        f0 = freqs[band][np.argmax(np.abs(spec[band]))]
+        near = (np.abs(freqs - f0) <= keep_hz) | (np.abs(freqs - 2 * f0) <= keep_hz)
+        spec *= np.where(near, 1.0, residual)
+        out[i:i + frame] += np.fft.irfft(spec, frame) * window
+        norm[i:i + frame] += window ** 2
+    return (out / np.maximum(norm, 1e-6))[:len(signal)]
+
+
+def pitch_up(signal, factor):
+    """再生速度を factor 倍にする (周波数が factor 倍、長さが 1/factor)"""
+    positions = np.arange(0, len(signal) - 1, factor)
+    return np.interp(positions, np.arange(len(signal)), signal)
+
+
 def fade(signal, seconds):
     n = max(1, int(RATE * seconds))
     ramp = np.linspace(0.0, 1.0, n)
@@ -76,14 +124,23 @@ def main(recording_dir, out_dir):
     recording_dir, out = Path(recording_dir), Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     cache = {}
-    for name, (source, start, end, fade_seconds) in SEGMENTS.items():
+    for name, (source, start, end, fade_seconds, *options) in SEGMENTS.items():
+        options = options[0] if options else {}
         if source not in cache:
             cache[source] = load(recording_dir / f"{source}.wav")
+        recording = cache[source]
         # フィルタの端の乱れを避けるため、前後に余裕を持たせて処理してから切る
         margin = int(RATE * 0.05)
         a, b = int(RATE * start), int(RATE * end)
-        piece = highpass(cache[source][max(0, a - margin):b + margin], HIGHPASS_HZ)
+        piece = highpass(recording[max(0, a - margin):b + margin], HIGHPASS_HZ)
         piece = piece[a - max(0, a - margin):][:b - a]
+        if options.get("denoise"):
+            context = highpass(recording[max(0, a - RATE * 2):b + RATE * 2], HIGHPASS_HZ)
+            piece = denoise(piece, context)
+        if options.get("tonal"):
+            piece = tonal(piece)
+        if "pitch" in options:
+            piece = pitch_up(piece, options["pitch"])
         piece = fade(piece - np.mean(piece), fade_seconds)
         piece *= PEAK / (np.max(np.abs(piece)) + 1e-9)
         path = out / f"{name}.wav"
