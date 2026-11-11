@@ -21,6 +21,7 @@ public sealed unsafe class SparrowController : IDisposable
     private readonly BonePoser bonePoser;
     private readonly GroundProbe groundProbe = new();
     private readonly RisingEdge localAggression = new();
+    private readonly CraftWatcher craftWatcher = new();
     // 持ち主の EntityId ごとのスズメ
     private readonly Dictionary<uint, SparrowAgent> agents = new();
     private int consecutiveErrors;
@@ -122,7 +123,9 @@ public sealed unsafe class SparrowController : IDisposable
             localAggression.Update(SparrowAgent.IsAggressive(localCharacter)),
             localJumping,
             localMounted,
-            Plugin.Condition[ConditionFlag.Crafting]);
+            Plugin.Condition[ConditionFlag.Crafting],
+            craftWatcher.Update(),
+            craftWatcher.QuickSynthesis);
 
         var seen = new HashSet<uint>();
         var allFound = MinionTracker.FindAllSparrows();

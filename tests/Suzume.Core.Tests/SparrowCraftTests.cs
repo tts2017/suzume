@@ -15,14 +15,24 @@ public class SparrowCraftTests
         WanderDelay = float.PositiveInfinity,
         DustBathIntervalMin = float.PositiveInfinity,
         DustBathIntervalMax = float.PositiveInfinity,
-        CraftCircleIntervalMin = 5f,
-        CraftCircleIntervalMax = 5f,
-        CraftCircleDurationMin = 3f,
-        CraftCircleDurationMax = 3f,
+        CraftQuickCircleIntervalMin = 5f,
+        CraftQuickCircleIntervalMax = 5f,
     };
 
-    private static SparrowInput Input(bool crafting = false, bool perch = false) =>
-        new(Dt, Player + FollowSpot, 0f, Player, Vector3.Zero, false, Player + Head, perch, Crafting: crafting);
+    private static SparrowInput Input(bool crafting = false, bool perch = false, bool completed = false, bool quick = false) =>
+        new(Dt, Player + FollowSpot, 0f, Player, Vector3.Zero, false, Player + Head, perch, Crafting: crafting, CraftCompleted: completed,
+            QuickSynthesis: quick);
+
+    /// <summary>頭のまわりを回った角度 (ラジアン、向きは問わない)。</summary>
+    private static float SweptAroundHead(IEnumerable<SparrowPose> poses)
+    {
+        var angles = poses.Where(x => x.State is SparrowState.Fly && Angles.HorizontalDistance(x.Position, Head) > 0.4f)
+            .Select(x => MathF.Atan2(x.Position.X - Head.X, x.Position.Z - Head.Z)).ToList();
+        return MathF.Abs(angles.Zip(angles.Skip(1), (a, b) => Angles.Wrap(b - a)).Sum());
+    }
+
+    /// <summary>制作中に、最初のフレームで制作が完成する。</summary>
+    private static SparrowInput CompletedAtStart(int frame) => Input(crafting: true, completed: frame == 0);
 
     private static List<SparrowPose> Run(SparrowBrain brain, Func<int, SparrowInput> input, float seconds)
     {
@@ -56,12 +66,12 @@ public class SparrowCraftTests
     }
 
     [Fact]
-    public void FliesAroundTheHeadAndComesBack()
+    public void CirclesTheHeadTwiceWhenACraftIsCompleted()
     {
         var p = Params();
         var brain = CraftingBrain(p);
 
-        var poses = Run(brain, _ => Input(crafting: true), 10f);
+        var poses = Run(brain, CompletedAtStart, 10f);
 
         var flying = poses.Where(x => x.State is SparrowState.Fly).ToList();
         Assert.NotEmpty(flying);
@@ -72,27 +82,103 @@ public class SparrowCraftTests
             Assert.True(away < p.CraftCircleRadius + 0.6f, $"頭から {away}");
             Assert.InRange(x.Position.Y, Head.Y - 0.05f, Head.Y + p.CraftCircleAltitudeMax + 0.6f);
         });
-        // 頭のまわりを半周以上まわる
-        var angles = flying.Where(x => Angles.HorizontalDistance(x.Position, Head) > 0.4f)
-            .Select(x => MathF.Atan2(x.Position.X - Head.X, x.Position.Z - Head.Z)).ToList();
-        var swept = angles.Zip(angles.Skip(1), (a, b) => Angles.Wrap(b - a)).Sum();
-        Assert.True(MathF.Abs(swept) > MathF.PI, $"回った角度 {swept}");
+        // 頭のまわりを 2 周まわる (3 周目には入らない)
+        var laps = SweptAroundHead(poses) / MathF.Tau;
+        Assert.InRange(laps, 1.8f, 2.3f);
         // 回り終えたら頭に戻って待つ
         Assert.Equal(SparrowState.Perched, poses[^1].State);
         Assert.Equal(Head, poses[^1].Position);
     }
 
     [Fact]
-    public void KeepsCirclingAtIntervalsWhileCrafting()
+    public void WaitsOnTheHeadUntilACraftIsCompleted()
     {
         var brain = CraftingBrain(Params());
 
         var poses = Run(brain, _ => Input(crafting: true), 40f);
 
+        Assert.All(poses, x => Assert.Equal(SparrowState.Perched, x.State));
+    }
+
+    [Fact]
+    public void CirclesOnceForEachCompletedCraft()
+    {
+        var brain = CraftingBrain(Params());
+
+        // 0 秒と 15 秒に制作が完成する
+        var poses = Run(brain, i => Input(crafting: true, completed: i == 0 || i == 15 * 60), 30f);
+
+        Assert.Equal(2, poses.Count(x => x.Triggers.HasFlag(SparrowTrigger.TakeOff)));
+        var returns = poses.Zip(poses.Skip(1)).Count(x => x.First.State != SparrowState.Perched && x.Second.State == SparrowState.Perched);
+        Assert.Equal(2, returns);
+        Assert.Equal(SparrowState.Perched, poses[^1].State);
+    }
+
+    [Fact]
+    public void CirclesAtIntervalsDuringQuickSynthesis()
+    {
+        var brain = CraftingBrain(Params());
+
+        var poses = Run(brain, _ => Input(crafting: true, quick: true), 30f);
+
         Assert.True(poses.Count(x => x.Triggers.HasFlag(SparrowTrigger.TakeOff)) >= 3);
-        // 回るたびに頭へ戻る
         var returns = poses.Zip(poses.Skip(1)).Count(x => x.First.State != SparrowState.Perched && x.Second.State == SparrowState.Perched);
         Assert.True(returns >= 3, $"頭に戻ったのは {returns} 回");
+    }
+
+    [Fact]
+    public void QuickSynthesisWaitsARandomTimeBetweenCircles()
+    {
+        var p = Params();
+        p.CraftQuickCircleIntervalMin = 4f;
+        p.CraftQuickCircleIntervalMax = 12f;
+        var brain = CraftingBrain(p);
+
+        var poses = Run(brain, _ => Input(crafting: true, quick: true), 120f);
+
+        // 頭の上で待った時間がばらつく
+        var waits = new List<int>();
+        var run = 0;
+        foreach (var pose in poses)
+        {
+            if (pose.State == SparrowState.Perched)
+                run++;
+            else if (run > 0)
+            {
+                waits.Add(run);
+                run = 0;
+            }
+        }
+        Assert.True(waits.Count >= 4, $"待った回数 {waits.Count}");
+        Assert.True(waits.Max() - waits.Min() > 60, $"待った時間 {string.Join(", ", waits)}");
+    }
+
+    [Fact]
+    public void CirclesOnceItReachesTheHeadIfTheCraftWasCompletedOnTheWay()
+    {
+        var brain = new SparrowBrain(Params(), new SeededRandom(1));
+        brain.Tick(Input());
+
+        var poses = Run(brain, i => Input(crafting: true, completed: i == 1), 12f);
+
+        // 頭へ向かう 1 回と、頭のまわりを回る 1 回
+        Assert.Equal(2, poses.Count(x => x.Triggers.HasFlag(SparrowTrigger.TakeOff)));
+        Assert.Equal(SparrowState.Perched, poses[^1].State);
+    }
+
+    [Fact]
+    public void ForgetsACompletedCraftWhenCraftingEnds()
+    {
+        var brain = new SparrowBrain(Params(), new SeededRandom(1));
+        brain.Tick(Input());
+        Run(brain, i => Input(crafting: true, completed: i == 1), 0.2f);
+        Run(brain, _ => Input(), 8f);
+
+        // 次の制作では、完成するまで頭の上で待つ
+        var poses = Run(brain, _ => Input(crafting: true), 20f);
+
+        Assert.Equal(1, poses.Count(x => x.Triggers.HasFlag(SparrowTrigger.TakeOff)));
+        Assert.Equal(SparrowState.Perched, poses[^1].State);
     }
 
     [Fact]
@@ -111,7 +197,7 @@ public class SparrowCraftTests
     public void GoesToTheGroundIfCraftingEndsWhileCircling()
     {
         var brain = CraftingBrain(Params());
-        Run(brain, _ => Input(crafting: true), 6f);
+        Run(brain, CompletedAtStart, 1.5f);
 
         var poses = Run(brain, _ => Input(), 8f);
 
@@ -137,7 +223,7 @@ public class SparrowCraftTests
     public void BeckonWhileCirclingSendsItToTheGround()
     {
         var brain = CraftingBrain(Params());
-        Run(brain, _ => Input(crafting: true), 6f);
+        Run(brain, CompletedAtStart, 1.5f);
 
         brain.Tick(Input(crafting: true, perch: true));
         var poses = Run(brain, _ => Input(crafting: true), 8f);

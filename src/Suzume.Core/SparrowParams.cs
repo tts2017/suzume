@@ -179,11 +179,14 @@ public sealed class SparrowParams
     public float WaryDurationMin { get; set; } = 5f;
     public float WaryDurationMax { get; set; } = 10f;
 
-    // 制作中: 頭に乗って待ち、頭の上でこれだけ待つたびに、頭のまわりをこの時間だけ飛んで戻る
-    public float CraftCircleIntervalMin { get; set; } = 15f;
-    public float CraftCircleIntervalMax { get; set; } = 30f;
-    public float CraftCircleDurationMin { get; set; } = 3f;
-    public float CraftCircleDurationMax { get; set; } = 5f;
+    // 制作中: 頭に乗って待ち、制作が完成するたびに、頭のまわりをこの周数だけ飛んで戻る
+    public float CraftCompletedLaps { get; set; } = 2f;
+    // 簡易制作中: 頭の上でこの間のランダムな時間待つたびに、頭のまわりをこの周数だけ飛んで戻る
+    public float CraftQuickCircleIntervalMin { get; set; } = 15f;
+    public float CraftQuickCircleIntervalMax { get; set; } = 30f;
+    public float CraftQuickLaps { get; set; } = 1f;
+    // 1 周にこれ以上かかったら、回るのをやめて頭へ戻る (何かに引っかかったときの逃げ道)
+    public float CraftCircleLapMaxSeconds { get; set; } = 6f;
     // 回る輪の半径と、輪の上でこれだけ先の点を目指して飛ぶ角度
     public float CraftCircleRadius { get; set; } = 1.0f;
     public float CraftCircleLeadDeg { get; set; } = 60f;

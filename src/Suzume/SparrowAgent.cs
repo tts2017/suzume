@@ -14,7 +14,9 @@ public readonly record struct FrameContext(
     bool LocalAggression,
     bool LocalJumping,
     bool LocalMounted,
-    bool LocalCrafting);
+    bool LocalCrafting,
+    bool LocalCraftCompleted,
+    bool LocalQuickSynthesis);
 
 /// <summary>
 /// タビスズメ 1 羽ぶんの制御。行動の判断・地面・手まねきの検出などの状態を持ち、持ち主に付いていく。
@@ -113,14 +115,17 @@ public sealed unsafe class SparrowAgent
         if (isLocal && beckoned)
             Plugin.Log.Debug($"手まねきを検出 (状態 {LastPose.State}) 頭={head:F2}");
 
-        // 制作中 (製作手帳を開いている間) は頭に乗って待つ。他の人はキャラクターの状態で見る
+        // 制作中 (製作手帳を開いている間) は頭に乗って待つ。他の人はキャラクターの状態で見る。
+        // 完成したときや簡易制作中に頭のまわりを回るのは、それが分かる自分のスズメだけ
         var crafting = config.CraftPerch && (isLocal ? frame.LocalCrafting : owner->Mode == CharacterModes.Crafting);
         if (isLocal && crafting != lastCrafting)
             Plugin.Log.Debug($"制作中 {lastCrafting} -> {crafting} (状態 {LastPose.State})");
         lastCrafting = crafting;
 
         var pose = brain.Tick(new SparrowInput(
-            dt, target, player->Rotation, ownerPosition, ownerVelocity, mounted, head, beckoned, jumping, threatened, crafting));
+            dt, target, player->Rotation, ownerPosition, ownerVelocity, mounted, head, beckoned, jumping, threatened, crafting,
+            CraftCompleted: isLocal && crafting && frame.LocalCraftCompleted,
+            QuickSynthesis: isLocal && crafting && frame.LocalQuickSynthesis));
         if (isLocal && pose.State != LastPose.State)
             Plugin.Log.Debug($"状態 {LastPose.State} -> {pose.State} 位置={pose.Position:F2} 頭={head:F2}");
 

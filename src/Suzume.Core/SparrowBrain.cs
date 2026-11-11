@@ -123,9 +123,15 @@ public sealed class SparrowBrain
     // 制作中: 制作が始まって頭に乗ったか(終わったら下りる)、頭のまわりを回っている途中か
     private bool wasCrafting;
     private bool craftPerch;
-    private float craftCircleCountdown;
+    // 制作が完成したが、まだ頭のまわりを回っていない
+    private bool circlePending;
     private bool circling;
     private float circleTimeLeft;
+    // 頭のまわりを、あとこれだけの角度 (ラジアン) 回る
+    private float circleSweepLeft;
+    private float? lastCircleAngle;
+    private bool wasQuickSynthesis;
+    private float quickCircleCountdown;
     private float circleDirection = 1f;
 
     /// <param name="groundAt">その場所の地面の高さ。分からなければ null を返す。省略時は目標地点の高さで代用する</param>
@@ -416,6 +422,7 @@ public sealed class SparrowBrain
         perchIntent = false;
         craftPerch = false;
         circling = false;
+        circlePending = false;
         var flee = input.PlayerPosition + direction * (Angles.HorizontalDistance(position, input.PlayerPosition)
             + rng.Range(p.ScareFleeDistanceMin, p.ScareFleeDistanceMax));
         scarePoint = OnGround(flee with { Y = input.Target.Y });
@@ -500,7 +507,8 @@ public sealed class SparrowBrain
     }
 
     /// <summary>
-    /// 制作が始まったら頭に乗り、頭の上でしばらく待つたびに頭のまわりを飛んで戻る。
+    /// 制作が始まったら頭に乗り、制作が完成するたびに頭のまわりを飛んで戻る。
+    /// 簡易制作の間は、ランダムな時間ごとに頭のまわりを飛んで戻る。
     /// 終わったら、制作のために乗っていたときだけ下りる。
     /// </summary>
     private void UpdateCrafting(in SparrowInput input, float dt)
@@ -511,7 +519,7 @@ public sealed class SparrowBrain
 
         if (started)
         {
-            craftCircleCountdown = rng.Range(p.CraftCircleIntervalMin, p.CraftCircleIntervalMax);
+            circlePending = false;
             if (!perchIntent && !scared)
             {
                 craftPerch = true;
@@ -523,6 +531,7 @@ public sealed class SparrowBrain
         if (ended)
         {
             circling = false;
+            circlePending = false;
             if (craftPerch)
                 perchIntent = false;
             craftPerch = false;
@@ -532,19 +541,65 @@ public sealed class SparrowBrain
             return;
         }
 
-        if (!input.Crafting || state != SparrowState.Perched)
+        var quick = input.Crafting && input.QuickSynthesis;
+        if (quick && !wasQuickSynthesis)
+            quickCircleCountdown = rng.Range(p.CraftQuickCircleIntervalMin, p.CraftQuickCircleIntervalMax);
+        wasQuickSynthesis = quick;
+
+        if (!input.Crafting)
             return;
 
-        craftCircleCountdown -= dt;
-        if (craftCircleCountdown > 0f)
+        // 頭へ向かう途中や回っている途中に完成したときは、頭に着いてから回る
+        if (input.CraftCompleted)
+            circlePending = true;
+        if (state != SparrowState.Perched)
             return;
 
-        craftCircleCountdown = rng.Range(p.CraftCircleIntervalMin, p.CraftCircleIntervalMax);
-        circleTimeLeft = rng.Range(p.CraftCircleDurationMin, p.CraftCircleDurationMax);
+        if (circlePending)
+        {
+            circlePending = false;
+            StartCircling(input, p.CraftCompletedLaps);
+            return;
+        }
+
+        if (!quick)
+            return;
+
+        quickCircleCountdown -= dt;
+        if (quickCircleCountdown > 0f)
+            return;
+
+        quickCircleCountdown = rng.Range(p.CraftQuickCircleIntervalMin, p.CraftQuickCircleIntervalMax);
+        StartCircling(input, p.CraftQuickLaps);
+    }
+
+    /// <summary>頭から飛び立ち、頭のまわりを決まった周数だけ回る。</summary>
+    private void StartCircling(in SparrowInput input, float laps)
+    {
+        circleSweepLeft = laps * MathF.Tau;
+        circleTimeLeft = laps * p.CraftCircleLapMaxSeconds;
+        lastCircleAngle = null;
         circleDirection = rng.Range(0f, 1f) < 0.5f ? -1f : 1f;
         circling = true;
         goal = Goal(input);
         EnterTakeOff(input);
+    }
+
+    /// <summary>頭のまわりを回った角度を数え、回り終えたら true。</summary>
+    private bool CountCircleSweep(Vector3 head, float dt)
+    {
+        circleTimeLeft -= dt;
+        var offset = Angles.Horizontal(position - head);
+        // 頭のすぐ上 (飛び立った直後など) では角度が定まらないので数えない
+        if (offset.Length() > 0.3f)
+        {
+            var angle = MathF.Atan2(offset.X, offset.Z);
+            if (lastCircleAngle is { } last)
+                circleSweepLeft -= MathF.Abs(Angles.Wrap(angle - last));
+            lastCircleAngle = angle;
+        }
+
+        return circleSweepLeft <= 0f || circleTimeLeft <= 0f;
     }
 
     /// <summary>頭のまわりの輪の上で、今いる所から少し先の点。</summary>
@@ -1014,8 +1069,7 @@ public sealed class SparrowBrain
         // 頭のまわりを回り終えたら、頭へ降りる
         if (circling)
         {
-            circleTimeLeft -= dt;
-            if (circleTimeLeft <= 0f)
+            if (CountCircleSweep(input.HeadPosition, dt))
             {
                 circling = false;
                 goal = Goal(input);
