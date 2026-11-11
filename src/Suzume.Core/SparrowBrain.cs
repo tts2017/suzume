@@ -116,6 +116,13 @@ public sealed class SparrowBrain
     // 様子見が終わって戻る途中。離れていればホップではなく飛んで戻る
     private bool returning;
     private Vector3 landStartPosition;
+    // 制作中: 制作が始まって頭に乗ったか(終わったら下りる)、頭のまわりを回っている途中か
+    private bool wasCrafting;
+    private bool craftPerch;
+    private float craftCircleCountdown;
+    private bool circling;
+    private float circleTimeLeft;
+    private float circleDirection = 1f;
 
     /// <param name="groundAt">その場所の地面の高さ。分からなければ null を返す。省略時は目標地点の高さで代用する</param>
     public SparrowBrain(SparrowParams parameters, IRandom random, Func<Vector3, float?>? groundAt = null)
@@ -156,6 +163,7 @@ public sealed class SparrowBrain
             OnThreatened(input);
         else if (input.PerchRequested)
             OnBeckoned(input);
+        UpdateCrafting(input, dt);
 
         switch (state)
         {
@@ -362,6 +370,7 @@ public sealed class SparrowBrain
 
     private Vector3 Goal(in SparrowInput input) =>
         scared ? scarePoint
+        : circling ? CirclePoint(input.HeadPosition)
         : perchIntent ? input.HeadPosition
         : hasWanderPoint ? wanderPoint
         : input.Target;
@@ -381,6 +390,8 @@ public sealed class SparrowBrain
 
         scared = true;
         perchIntent = false;
+        craftPerch = false;
+        circling = false;
         var flee = input.PlayerPosition + direction * (Angles.HorizontalDistance(position, input.PlayerPosition)
             + rng.Range(p.ScareFleeDistanceMin, p.ScareFleeDistanceMax));
         scarePoint = OnGround(flee with { Y = input.Target.Y });
@@ -433,17 +444,26 @@ public sealed class SparrowBrain
         hasWanderPoint = true;
     }
 
-    /// <summary>手招き: 頭の上にいれば下り、そうでなければ頭へ向かう。</summary>
+    /// <summary>手招き: 頭の上か頭のまわりにいれば下り、そうでなければ頭へ向かう。</summary>
     private void OnBeckoned(in SparrowInput input)
     {
-        if (state == SparrowState.Perched)
+        if (state == SparrowState.Perched || circling)
         {
             perchIntent = false;
+            craftPerch = false;
+            circling = false;
             goal = Goal(input);
-            EnterTakeOff(input);
+            if (state == SparrowState.Perched)
+                EnterTakeOff(input);
             return;
         }
 
+        StartPerch(input);
+    }
+
+    /// <summary>頭へ向かう(すでに向かっていれば何もしない)。</summary>
+    private void StartPerch(in SparrowInput input)
+    {
         if (perchIntent)
             return;
 
@@ -453,6 +473,63 @@ public sealed class SparrowBrain
         if (state is SparrowState.Idle or SparrowState.Hop or SparrowState.Forage or SparrowState.Preen
             or SparrowState.Alarm or SparrowState.DustBath)
             EnterTakeOff(input);
+    }
+
+    /// <summary>
+    /// 制作が始まったら頭に乗り、頭の上でしばらく待つたびに頭のまわりを飛んで戻る。
+    /// 終わったら、制作のために乗っていたときだけ下りる。
+    /// </summary>
+    private void UpdateCrafting(in SparrowInput input, float dt)
+    {
+        var started = input.Crafting && !wasCrafting;
+        var ended = !input.Crafting && wasCrafting;
+        wasCrafting = input.Crafting;
+
+        if (started)
+        {
+            craftCircleCountdown = rng.Range(p.CraftCircleIntervalMin, p.CraftCircleIntervalMax);
+            if (!perchIntent && !scared)
+            {
+                craftPerch = true;
+                StartPerch(input);
+            }
+            return;
+        }
+
+        if (ended)
+        {
+            circling = false;
+            if (craftPerch)
+                perchIntent = false;
+            craftPerch = false;
+            goal = Goal(input);
+            if (state == SparrowState.Perched && !perchIntent)
+                EnterTakeOff(input);
+            return;
+        }
+
+        if (!input.Crafting || state != SparrowState.Perched)
+            return;
+
+        craftCircleCountdown -= dt;
+        if (craftCircleCountdown > 0f)
+            return;
+
+        craftCircleCountdown = rng.Range(p.CraftCircleIntervalMin, p.CraftCircleIntervalMax);
+        circleTimeLeft = rng.Range(p.CraftCircleDurationMin, p.CraftCircleDurationMax);
+        circleDirection = rng.Range(0f, 1f) < 0.5f ? -1f : 1f;
+        circling = true;
+        goal = Goal(input);
+        EnterTakeOff(input);
+    }
+
+    /// <summary>頭のまわりの輪の上で、今いる所から少し先の点。</summary>
+    private Vector3 CirclePoint(Vector3 head)
+    {
+        var offset = Angles.Horizontal(position - head);
+        var angle = offset.Length() > 0.1f ? MathF.Atan2(offset.X, offset.Z) : yaw;
+        angle += circleDirection * Angles.DegToRad(p.CraftCircleLeadDeg);
+        return head + new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle)) * p.CraftCircleRadius;
     }
 
     private void EnterPerched()
@@ -899,11 +976,36 @@ public sealed class SparrowBrain
 
     private void TickFly(in SparrowInput input, float dt)
     {
+        // 頭のまわりを回り終えたら、頭へ降りる
+        if (circling)
+        {
+            circleTimeLeft -= dt;
+            if (circleTimeLeft <= 0f)
+            {
+                circling = false;
+                goal = Goal(input);
+            }
+        }
+
         var gap = Angles.HorizontalDistance(position, goal);
         var playerSlow = Angles.Horizontal(input.PlayerVelocity).Length() < p.LandPlayerSpeed;
 
         float speed;
-        if (playerSlow && gap < p.ApproachDistance)
+        if (circling)
+        {
+            // 頭のすぐ上を、羽ばたきと滑空を繰り返しながらゆっくり回る
+            flightPhaseLeft -= dt;
+            if (flightPhaseLeft <= 0f)
+            {
+                flapping = !flapping;
+                flightPhaseLeft = flapping ? p.FlapDuration : p.GlideDuration;
+            }
+
+            altitude += (flapping ? p.FlapClimbSpeed : -p.GlideSinkSpeed) * dt;
+            altitude = Math.Clamp(altitude, p.CraftCircleAltitudeMin, p.CraftCircleAltitudeMax);
+            speed = p.CraftCircleSpeed;
+        }
+        else if (playerSlow && gap < p.ApproachDistance)
         {
             // 着地前の滑空: 羽ばたきの上下をやめ、目標までの距離に比例した高さへ下りながら減速する
             var glideAltitude = MathF.Min(altitude, p.GlideSlope * gap);
@@ -935,6 +1037,7 @@ public sealed class SparrowBrain
         // プレイヤーが速く動いている間は降りずに付いていく。地面の高さが目標に追いつくまでと、
         // 滑空の高さまで下りきるまでは降りない(真上から急降下しない)
         if (playerSlow
+            && !circling
             && Angles.HorizontalDistance(position, goal) < p.LandDistance
             && MathF.Abs(goal.Y - groundY) < Epsilon
             && altitude <= p.GlideSlope * p.LandDistance + Epsilon)

@@ -20,6 +20,8 @@ public sealed class Configuration : IPluginConfiguration
     public float WanderDistance { get; set; } = 2.5f;
     // 頭に乗るときの高さの補正 (yalm)。キャラクターの身長に合わせて調整する
     public float HeadOffset { get; set; }
+    // 制作中は頭に乗って待ち、ときどき頭のまわりを飛ぶ。制作が終わったら下りる
+    public bool CraftPerch { get; set; } = true;
     // ふくら雀: 冬のスズメのように羽毛をふくらませた丸い形にする
     public bool Puffed { get; set; } = true;
     // 体をどれだけ大きくするか (0.15 で 15%)

@@ -13,6 +13,7 @@ public sealed class UiText
     public required string FlyDistance { get; init; }
     public required string WanderDistance { get; init; }
     public required string HeadOffset { get; init; }
+    public required string CraftPerch { get; init; }
     public required string Puffed { get; init; }
     public required string PuffAmount { get; init; }
     public required string BeckonHint { get; init; }
@@ -60,6 +61,7 @@ public sealed class UiText
         FlyDistance = "飛ぶ距離 (yalm)",
         WanderDistance = "あなたから離れて動き回る距離 (yalm)",
         HeadOffset = "頭の高さの補正 (yalm)",
+        CraftPerch = "制作中は頭に乗る (ときどき頭のまわりを飛び、終わったら下りる)",
         Puffed = "ふくら雀 (羽毛をふくらませた丸い形)",
         PuffAmount = "ふくらみ (%)",
         BeckonHint = "/beckon (手まねき) で頭に乗り、もう一度で下ります",
@@ -103,6 +105,7 @@ public sealed class UiText
         FlyDistance = "Fly distance (yalms)",
         WanderDistance = "How far it roams from you (yalms)",
         HeadOffset = "Head height adjustment (yalms)",
+        CraftPerch = "Perch on your head while crafting (circles now and then, hops off when you finish)",
         Puffed = "Puffed up (round, fluffed winter feathers)",
         PuffAmount = "Puffiness (%)",
         BeckonHint = "/beckon to have it hop on your head; /beckon again to get it down",
@@ -146,6 +149,7 @@ public sealed class UiText
         FlyDistance = "Flugdistanz (Yalm)",
         WanderDistance = "Wie weit er sich von dir entfernt (Yalm)",
         HeadOffset = "Kopfhöhe anpassen (Yalm)",
+        CraftPerch = "Beim Handwerken auf dem Kopf sitzen (kreist ab und zu, steigt danach ab)",
         Puffed = "Aufgeplustert (rund, mit aufgestelltem Winterfederkleid)",
         PuffAmount = "Aufplusterung (%)",
         BeckonHint = "Mit /beckon hüpft er auf deinen Kopf, mit erneutem /beckon wieder herunter",
@@ -189,6 +193,7 @@ public sealed class UiText
         FlyDistance = "Distance de vol (yalms)",
         WanderDistance = "Distance à laquelle il s'éloigne de vous (yalms)",
         HeadOffset = "Ajustement de la hauteur de la tête (yalms)",
+        CraftPerch = "Se percher sur votre tête pendant l'artisanat (tourne autour de temps en temps, descend à la fin)",
         Puffed = "Ébouriffé (rond, plumage d'hiver gonflé)",
         PuffAmount = "Gonflement (%)",
         BeckonHint = "Avec /beckon, il saute sur votre tête ; refaites /beckon pour qu'il descende",

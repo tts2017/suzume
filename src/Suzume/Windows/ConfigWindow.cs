@@ -100,6 +100,13 @@ public sealed class ConfigWindow : Window
             changed = true;
         }
 
+        var craftPerch = config.CraftPerch;
+        if (ImGui.Checkbox(Text.CraftPerch, ref craftPerch))
+        {
+            config.CraftPerch = craftPerch;
+            changed = true;
+        }
+
         var puffed = config.Puffed;
         if (ImGui.Checkbox(Text.Puffed, ref puffed))
         {

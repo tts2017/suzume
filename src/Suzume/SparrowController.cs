@@ -121,7 +121,8 @@ public sealed unsafe class SparrowController : IDisposable
             CameraForward(localPlayer->Rotation),
             localAggression.Update(SparrowAgent.IsAggressive(localCharacter)),
             localJumping,
-            localMounted);
+            localMounted,
+            Plugin.Condition[ConditionFlag.Crafting]);
 
         var seen = new HashSet<uint>();
         var allFound = MinionTracker.FindAllSparrows();

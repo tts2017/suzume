@@ -58,6 +58,7 @@ public enum SparrowTrigger
 /// <param name="HeadPosition">プレイヤーの頭の上(止まる位置)</param>
 /// <param name="PerchRequested">この Tick で手招きされた(頭に乗る/下りるの切り替え)</param>
 /// <param name="Threatened">この Tick でスズメに向けて攻撃的なエモートをされた</param>
+/// <param name="Crafting">プレイヤーが制作中 (始まると頭に乗り、終わると下りる)</param>
 public readonly record struct SparrowInput(
     float Dt,
     Vector3 Target,
@@ -68,7 +69,8 @@ public readonly record struct SparrowInput(
     Vector3 HeadPosition = default,
     bool PerchRequested = false,
     bool PlayerJumping = false,
-    bool Threatened = false);
+    bool Threatened = false,
+    bool Crafting = false);
 
 /// <param name="Position">見た目の位置</param>
 /// <param name="Pitch">前傾角(ラジアン、正で頭が下がる)</param>
