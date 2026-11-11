@@ -94,6 +94,10 @@ public sealed class SparrowBrain
 
     // TakeOff / Fly / Land
     private bool flapping;
+    // 飛行中の羽ばたきの位相を進める時間
+    private float wingBeatTime;
+    // 最後に開いていた翼の開き。翼を閉じる途中も、開き具合に合わせて振りを小さくしていくのに使う
+    private float lastWingSpread;
     private float flightPhaseLeft;
     private float groundY;
     private float altitude;
@@ -286,7 +290,10 @@ public sealed class SparrowBrain
         shownSpread = Approach(shownSpread, wingSpread, dt, p.WingSpreadSmoothing);
         // 翼を開いている側は、閉じ切るまで覚えておく(閉じる途中で反対の翼が動かないように)
         if (wingSpread > 0f)
+        {
             shownWingSide = wingSide;
+            lastWingSpread = wingSpread;
+        }
         else if (shownSpread == 0f)
             shownWingSide = 0f;
 
@@ -310,10 +317,27 @@ public sealed class SparrowBrain
     }
 
     /// <summary>翼のばたつきは、開き具合に合わせて出し入れする(開いていない翼は振らない)。</summary>
-    private float ShownFlap() =>
-        wingSpread > 0f ? wingFlap * MathF.Min(1f, shownSpread / wingSpread)
-        : p.DustWingSpreadDeg > 0f ? wingFlap * MathF.Min(1f, shownSpread / Angles.DegToRad(p.DustWingSpreadDeg))
-        : 0f;
+    private float ShownFlap()
+    {
+        var reference = wingSpread > 0f ? wingSpread : lastWingSpread;
+        return reference > 0f ? wingFlap * MathF.Min(1f, shownSpread / reference) : 0f;
+    }
+
+    /// <summary>飛びながら翼を開いて羽ばたく。</summary>
+    private void BeatWings(float dt)
+    {
+        wingBeatTime += dt;
+        wingSpread = Angles.DegToRad(p.FlyWingSpreadDeg);
+        wingFlap = Angles.DegToRad(p.FlyWingBeatDeg) * MathF.Sin(MathF.Tau * p.FlyWingBeatHz * wingBeatTime);
+    }
+
+    /// <summary>翼を畳む。畳み終わるまでは羽ばたきを続け、開き具合に合わせて小さくしていく。</summary>
+    private void FoldWings(float dt)
+    {
+        wingBeatTime += dt;
+        wingSpread = 0f;
+        wingFlap = Angles.DegToRad(p.FlyWingBeatDeg) * MathF.Sin(MathF.Tau * p.FlyWingBeatHz * wingBeatTime);
+    }
 
     /// <summary>地上で止まっている間は、足元の地面の高さに合わせる(段差などでずれを残さない)。</summary>
     private void SnapToGround()
@@ -962,6 +986,7 @@ public sealed class SparrowBrain
     private void TickTakeOff(in SparrowInput input, float dt)
     {
         altitude += p.TakeOffClimbSpeed * dt;
+        BeatWings(dt);
         MoveTowards(goal, p.FlySpeed * 0.5f * dt, dt);
         AvoidTerrain(dt);
         position.Y = groundY + altitude;
@@ -969,9 +994,19 @@ public sealed class SparrowBrain
         if (stateTime < p.TakeOffDuration)
             return;
 
-        SetState(SparrowState.Fly);
+        ChangeFlightState(SparrowState.Fly);
         flapping = true;
         flightPhaseLeft = p.FlapDuration;
+    }
+
+    /// <summary>飛んだまま状態を変える。翼の開きと振りは引き継ぐ(切り替えの瞬間に翼が止まらないように)。</summary>
+    private void ChangeFlightState(SparrowState next)
+    {
+        var spread = wingSpread;
+        var flap = wingFlap;
+        SetState(next);
+        wingSpread = spread;
+        wingFlap = flap;
     }
 
     private void TickFly(in SparrowInput input, float dt)
@@ -1002,6 +1037,10 @@ public sealed class SparrowBrain
             }
 
             altitude += (flapping ? p.FlapClimbSpeed : -p.GlideSinkSpeed) * dt;
+            if (flapping)
+                BeatWings(dt);
+            else
+                FoldWings(dt);
             altitude = Math.Clamp(altitude, p.CraftCircleAltitudeMin, p.CraftCircleAltitudeMax);
             speed = p.CraftCircleSpeed;
         }
@@ -1010,6 +1049,7 @@ public sealed class SparrowBrain
             // 着地前の滑空: 羽ばたきの上下をやめ、目標までの距離に比例した高さへ下りながら減速する
             var glideAltitude = MathF.Min(altitude, p.GlideSlope * gap);
             altitude = MathF.Max(glideAltitude, altitude - p.GlideDescentSpeed * dt);
+            FoldWings(dt);
             speed = Math.Clamp(gap * p.ApproachSpeedPerYalm, p.ApproachMinSpeed, p.FlySpeed);
         }
         else
@@ -1023,6 +1063,10 @@ public sealed class SparrowBrain
             }
 
             altitude += (flapping ? p.FlapClimbSpeed : -p.GlideSinkSpeed) * dt;
+            if (flapping)
+                BeatWings(dt);
+            else
+                FoldWings(dt);
             altitude = Math.Clamp(altitude, p.FlyAltitudeMin, p.FlyAltitudeMax);
 
             // 騎乗中などで論理位置が速く動くときは、それより速く飛ぶ
@@ -1042,7 +1086,7 @@ public sealed class SparrowBrain
             && MathF.Abs(goal.Y - groundY) < Epsilon
             && altitude <= p.GlideSlope * p.LandDistance + Epsilon)
         {
-            SetState(SparrowState.Land);
+            ChangeFlightState(SparrowState.Land);
             landStartAltitude = altitude;
             landStartSpeed = speed;
             landStartPosition = position;
@@ -1056,6 +1100,10 @@ public sealed class SparrowBrain
         var u = MathF.Min(1f, stateTime / p.LandDuration);
         var settled = u * u * (3f - 2f * u);
         pitch = -Angles.DegToRad(p.FlarePitchDeg) * MathF.Sin(MathF.PI * u);
+        if (u < p.LandBrakeFraction)
+            BeatWings(dt);
+        else
+            FoldWings(dt);
 
         if (perchIntent)
         {

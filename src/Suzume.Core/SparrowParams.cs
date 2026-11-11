@@ -132,6 +132,10 @@ public sealed class SparrowParams
     public float TakeOffClimbSpeed { get; set; } = 2f;
     public float FlySpeed { get; set; } = 8f;
     public float FlapDuration { get; set; } = 0.3f;
+    // 羽ばたく間の翼: ゲームの飛行アニメの上から少し外へ開き、大きく速く上下に振る
+    public float FlyWingSpreadDeg { get; set; } = 20f;
+    public float FlyWingBeatDeg { get; set; } = 40f;
+    public float FlyWingBeatHz { get; set; } = 12f;
     public float GlideDuration { get; set; } = 0.2f;
     public float FlapClimbSpeed { get; set; } = 1.2f;
     public float GlideSinkSpeed { get; set; } = 1.0f;
@@ -156,6 +160,8 @@ public sealed class SparrowParams
     public float ApproachMinSpeed { get; set; } = 1.5f;
     // フレア: 最後に減速しながら頭を上げて降りる
     public float LandDuration { get; set; } = 0.35f;
+    // 着地のうち、はじめのこの割合は翼を開いてブレーキの羽ばたきをし、残りで翼を畳む
+    public float LandBrakeFraction { get; set; } = 0.5f;
     public float FlarePitchDeg { get; set; } = 15f;
     public float LandSettleDuration { get; set; } = 0.15f;
     public float LandPitchDeg { get; set; } = 15f;
